@@ -116,7 +116,7 @@ const Wallet = () => {
                       </div>
                       <Badge variant={
                         bonus.status === "Claimed" ? "secondary" :
-                        bonus.status === "Available" ? "success" : "outline"
+                        bonus.status === "Available" ? "default" : "outline"
                       }>
                         {bonus.status}
                       </Badge>
