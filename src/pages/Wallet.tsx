@@ -1,120 +1,131 @@
 import { Navigation } from "@/components/Navigation";
-import { Wallet as WalletIcon, ArrowUpRight, ArrowDownLeft, History, Gift } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
+import { Wallet as WalletIcon, ArrowUpRight, ArrowDownLeft, Clock, Gift } from "lucide-react";
 
 const Wallet = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <Navigation />
-      <main className="container mx-auto px-4 pt-20 pb-8">
-        <div className="grid gap-6 md:grid-cols-3">
-          {/* Balance Card */}
-          <Card className="md:col-span-2">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <WalletIcon className="h-5 w-5" />
-                Wallet Balance
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-4xl font-bold mb-6">$1,250.00</div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Button className="gap-2">
-                  <ArrowUpRight className="h-4 w-4" />
-                  Deposit Funds
-                </Button>
-                <Button variant="outline" className="gap-2">
-                  <ArrowDownLeft className="h-4 w-4" />
-                  Withdraw Funds
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+      
+      <main className="container mx-auto px-4 py-8">
+        <div className="max-w-6xl mx-auto">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold mb-2">My Wallet</h1>
+            <p className="text-muted-foreground">Manage your funds and transactions</p>
+          </div>
 
-          {/* Quick Stats */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Quick Stats</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div>
-                  <p className="text-sm text-muted">Total Winnings</p>
-                  <p className="text-2xl font-bold">$3,450.00</p>
+          <div className="grid md:grid-cols-2 gap-6 mb-8">
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <WalletIcon className="w-5 h-5 text-primary" />
+                  <h2 className="text-xl font-semibold">Available Balance</h2>
                 </div>
-                <div>
-                  <p className="text-sm text-muted">Active Contests</p>
-                  <p className="text-2xl font-bold">5</p>
+                <p className="text-4xl font-bold mb-6">$1,250.00</p>
+                <div className="flex gap-4">
+                  <Button className="flex-1">
+                    <ArrowUpRight className="w-4 h-4 mr-2" />
+                    Deposit
+                  </Button>
+                  <Button variant="outline" className="flex-1">
+                    <ArrowDownLeft className="w-4 h-4 mr-2" />
+                    Withdraw
+                  </Button>
                 </div>
-                <div>
-                  <p className="text-sm text-muted">Available Bonuses</p>
-                  <p className="text-2xl font-bold">$50.00</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          {/* Transaction History */}
-          <Card className="md:col-span-2">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <History className="h-5 w-5" />
-                Transaction History
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ScrollArea className="h-[300px]">
+            <Card>
+              <CardContent className="p-6">
+                <h2 className="text-xl font-semibold mb-4">Quick Stats</h2>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Total Winnings</p>
+                    <p className="text-2xl font-bold">$3,450</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Contests Joined</p>
+                    <p className="text-2xl font-bold">24</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Active Contests</p>
+                    <p className="text-2xl font-bold">3</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Win Rate</p>
+                    <p className="text-2xl font-bold">65%</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="w-5 h-5" />
+                  Recent Transactions
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
                 <div className="space-y-4">
-                  {[...Array(5)].map((_, i) => (
-                    <div
-                      key={i}
-                      className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
-                    >
+                  {[
+                    { type: "deposit", amount: 100, date: "2024-02-20" },
+                    { type: "withdrawal", amount: 50, date: "2024-02-19" },
+                    { type: "winning", amount: 200, date: "2024-02-18" },
+                  ].map((transaction, i) => (
+                    <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-gray-50">
                       <div>
-                        <p className="font-semibold">
-                          {i % 2 === 0 ? "Contest Winnings" : "Deposit"}
-                        </p>
-                        <p className="text-sm text-muted">
-                          {new Date().toLocaleDateString()}
-                        </p>
+                        <p className="font-medium capitalize">{transaction.type}</p>
+                        <p className="text-sm text-muted-foreground">{transaction.date}</p>
                       </div>
-                      <div className={`text-lg font-bold ${i % 2 === 0 ? "text-green-500" : "text-blue-500"}`}>
-                        {i % 2 === 0 ? "+" : "-"}$
-                        {(Math.random() * 1000).toFixed(2)}
+                      <div className="text-right">
+                        <p className={`font-bold ${
+                          transaction.type === "withdrawal" ? "text-red-500" : "text-green-500"
+                        }`}>
+                          {transaction.type === "withdrawal" ? "-" : "+"}${transaction.amount}
+                        </p>
                       </div>
                     </div>
                   ))}
                 </div>
-              </ScrollArea>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          {/* Bonuses & Rewards */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Gift className="h-5 w-5" />
-                Bonuses & Rewards
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {[...Array(3)].map((_, i) => (
-                  <div key={i} className="bg-gray-50 p-4 rounded-lg">
-                    <h3 className="font-semibold mb-1">Welcome Bonus #{i + 1}</h3>
-                    <p className="text-sm text-muted mb-3">
-                      Get {50 - i * 10}% bonus on your next deposit
-                    </p>
-                    <Button variant="outline" size="sm" className="w-full">
-                      Claim Now
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Gift className="w-5 h-5" />
+                  Bonuses & Rewards
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {[
+                    { name: "Welcome Bonus", amount: 50, status: "Claimed" },
+                    { name: "Referral Reward", amount: 25, status: "Available" },
+                    { name: "Weekly Bonus", amount: 100, status: "Pending" },
+                  ].map((bonus, i) => (
+                    <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-gray-50">
+                      <div>
+                        <p className="font-medium">{bonus.name}</p>
+                        <p className="text-sm text-muted-foreground">${bonus.amount}</p>
+                      </div>
+                      <Badge variant={
+                        bonus.status === "Claimed" ? "secondary" :
+                        bonus.status === "Available" ? "success" : "outline"
+                      }>
+                        {bonus.status}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </main>
     </div>

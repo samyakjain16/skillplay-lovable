@@ -1,108 +1,114 @@
 import { Navigation } from "@/components/Navigation";
-import { Award, Calendar, Star } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Trophy, Calendar, Gift } from "lucide-react";
 
 const Sponsorships = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <Navigation />
-      <main className="container mx-auto px-4 pt-20 pb-8">
-        <div className="space-y-6">
-          {/* Featured Sponsorship */}
-          <Card className="bg-gradient-to-r from-primary/10 to-primary/5">
-            <CardContent className="pt-6">
-              <div className="grid gap-6 md:grid-cols-2">
-                <div>
-                  <h2 className="text-2xl font-bold mb-2">Summer Championship</h2>
-                  <p className="text-muted mb-4">
-                    Join the biggest tournament of the season with a massive prize pool
-                    sponsored by our partners.
-                  </p>
-                  <Button size="lg" className="w-full md:w-auto">
-                    Register Now
-                  </Button>
-                </div>
-                <div className="flex items-center justify-center">
-                  <div className="text-center">
-                    <div className="text-4xl font-bold text-primary mb-2">$50,000</div>
-                    <div className="text-muted">Prize Pool</div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+      
+      <main className="container mx-auto px-4 py-8">
+        <div className="max-w-6xl mx-auto">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold mb-2">Sponsored Tournaments</h1>
+            <p className="text-muted-foreground">Exclusive contests with amazing prizes</p>
+          </div>
 
-          <div className="grid gap-6 md:grid-cols-3">
-            {/* Sponsored Tournaments */}
+          <div className="grid md:grid-cols-2 gap-6 mb-8">
+            <Card className="bg-gradient-to-br from-primary/10 to-primary/5">
+              <CardContent className="p-6">
+                <Badge className="mb-4">Featured</Badge>
+                <h2 className="text-2xl font-bold mb-2">Tech Giant Challenge</h2>
+                <p className="text-muted-foreground mb-4">
+                  Win the latest gadgets and cash prizes worth $10,000
+                </p>
+                <div className="flex items-center gap-2 mb-6">
+                  <Calendar className="w-4 h-4" />
+                  <span className="text-sm">Starts in 2 days</span>
+                </div>
+                <Button>Register Now</Button>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-secondary/10 to-secondary/5">
+              <CardContent className="p-6">
+                <Badge variant="secondary" className="mb-4">Coming Soon</Badge>
+                <h2 className="text-2xl font-bold mb-2">Global Gaming Series</h2>
+                <p className="text-muted-foreground mb-4">
+                  Sponsored by major gaming brands. $25,000 prize pool.
+                </p>
+                <div className="flex items-center gap-2 mb-6">
+                  <Calendar className="w-4 h-4" />
+                  <span className="text-sm">Starts in 5 days</span>
+                </div>
+                <Button variant="secondary">Notify Me</Button>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Star className="h-5 w-5" />
-                  Sponsored Tournaments
+                  <Trophy className="w-5 h-5" />
+                  Active Tournaments
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {[...Array(3)].map((_, i) => (
-                    <div key={i} className="bg-gray-50 p-4 rounded-lg">
-                      <h3 className="font-semibold mb-2">Tournament {i + 1}</h3>
-                      <p className="text-sm text-gray-600 mb-3">
-                        Sponsored by Company {i + 1}
-                      </p>
-                      <Button variant="outline" size="sm" className="w-full">
-                        View Details
-                      </Button>
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">Tournament {i}</p>
+                        <p className="text-sm text-muted-foreground">Prize: $1,000</p>
+                      </div>
+                      <Button size="sm">Join</Button>
                     </div>
                   ))}
                 </div>
               </CardContent>
             </Card>
 
-            {/* Exclusive Rewards */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Award className="h-5 w-5" />
+                  <Gift className="w-5 h-5" />
                   Exclusive Rewards
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {[...Array(3)].map((_, i) => (
-                    <div key={i} className="bg-gray-50 p-4 rounded-lg">
-                      <h3 className="font-semibold mb-2">Special Prize {i + 1}</h3>
-                      <p className="text-sm text-gray-600 mb-3">
-                        Win exclusive merchandise and rewards
-                      </p>
-                      <Button variant="outline" size="sm" className="w-full">
-                        Learn More
-                      </Button>
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">Special Prize {i}</p>
+                        <p className="text-sm text-muted-foreground">Worth $500</p>
+                      </div>
+                      <Badge>Limited</Badge>
                     </div>
                   ))}
                 </div>
               </CardContent>
             </Card>
 
-            {/* Upcoming Events */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5" />
+                  <Calendar className="w-5 h-5" />
                   Upcoming Events
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {[...Array(3)].map((_, i) => (
-                    <div key={i} className="bg-gray-50 p-4 rounded-lg">
-                      <h3 className="font-semibold mb-2">Mega Contest {i + 1}</h3>
-                      <p className="text-sm text-gray-600 mb-3">
-                        Starts in {3 - i} days
-                      </p>
-                      <Button variant="outline" size="sm" className="w-full">
-                        Set Reminder
-                      </Button>
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">Event {i}</p>
+                        <p className="text-sm text-muted-foreground">In 7 days</p>
+                      </div>
+                      <Button variant="outline" size="sm">Remind</Button>
                     </div>
                   ))}
                 </div>
