@@ -12,6 +12,10 @@ export const MyContests = () => {
   const { data: contests, isLoading } = useQuery({
     queryKey: ["my-contests"],
     queryFn: async () => {
+      if (!user?.id) {
+        return [];
+      }
+
       const { data, error } = await supabase
         .from("user_contests")
         .select(`
@@ -24,10 +28,22 @@ export const MyContests = () => {
       if (error) throw error;
       return data;
     },
+    enabled: !!user?.id, // Only run query when user ID is available
   });
 
   if (isLoading) {
     return <div>Loading your contests...</div>;
+  }
+
+  if (!contests || contests.length === 0) {
+    return (
+      <div className="text-center py-8">
+        <h3 className="text-lg font-semibold">No Contests Yet</h3>
+        <p className="text-sm text-muted-foreground mt-2">
+          Join a contest to see it here!
+        </p>
+      </div>
+    );
   }
 
   return (
