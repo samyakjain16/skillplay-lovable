@@ -22,7 +22,7 @@ const Index = () => {
         <div className="container mx-auto px-4 py-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <Button
-              onClick={() => navigate('/contest/1')}
+              onClick={() => navigate('/gaming')} // Changed from '/contest/1' to '/gaming'
               className="flex items-center gap-2 h-16"
               variant="outline"
             >

@@ -13,7 +13,7 @@ export const Navigation = () => {
 
   const handleAuthAction = () => {
     if (user) {
-      navigate('/contests');
+      navigate('/gaming'); // Changed from '/contests' to '/gaming'
     } else {
       navigate('/auth');
     }
