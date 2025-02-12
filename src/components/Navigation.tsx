@@ -2,13 +2,14 @@
 import { useState } from 'react';
 import { Menu, X } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from './ui/button';
 
 export const Navigation = () => {
   const [isOpen, setIsOpen] = useState(false);
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleAuthAction = () => {
     if (user) {
@@ -17,6 +18,11 @@ export const Navigation = () => {
       navigate('/auth');
     }
   };
+
+  // Check if we're in the gaming section
+  const isGamingSection = location.pathname.includes('/gaming') || 
+                         location.pathname.includes('/contests') || 
+                         location.pathname.includes('/my-contests');
 
   return (
     <nav className="fixed w-full bg-white/80 backdrop-blur-md z-50 border-b border-gray-200">
@@ -27,15 +33,18 @@ export const Navigation = () => {
           </div>
           
           <div className="hidden md:flex items-center space-x-8">
-            <a href="/" className="nav-link">Home</a>
-            <a href="/contests" className="nav-link">Contests</a>
-            <a href="/leaderboard" className="nav-link">Leaderboard</a>
-            {user ? (
+            {!isGamingSection && (
               <>
-                <Button onClick={handleAuthAction}>Go to Contests</Button>
-                <Button variant="outline" onClick={() => signOut()}>Sign Out</Button>
+                <a href="/" className="nav-link">Home</a>
+                {user && (
+                  <Button onClick={handleAuthAction}>Go to Contests</Button>
+                )}
               </>
-            ) : (
+            )}
+            {user && (
+              <Button variant="outline" onClick={() => signOut()}>Sign Out</Button>
+            )}
+            {!user && (
               <Button onClick={handleAuthAction}>Start Playing</Button>
             )}
           </div>
@@ -54,14 +63,16 @@ export const Navigation = () => {
       {isOpen && (
         <div className="md:hidden">
           <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-            <a href="/" className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-gray-900">Home</a>
-            <a href="/contests" className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-gray-900">Contests</a>
-            <a href="/leaderboard" className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-gray-900">Leaderboard</a>
-            {user ? (
+            {!isGamingSection && (
               <>
-                <Button className="w-full" onClick={handleAuthAction}>Go to Contests</Button>
-                <Button className="w-full mt-2" variant="outline" onClick={() => signOut()}>Sign Out</Button>
+                <a href="/" className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-gray-900">Home</a>
+                {user && (
+                  <Button className="w-full" onClick={handleAuthAction}>Go to Contests</Button>
+                )}
               </>
+            )}
+            {user ? (
+              <Button className="w-full mt-2" variant="outline" onClick={() => signOut()}>Sign Out</Button>
             ) : (
               <Button className="w-full" onClick={handleAuthAction}>Start Playing</Button>
             )}
