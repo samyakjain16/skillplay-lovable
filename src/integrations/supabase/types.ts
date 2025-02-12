@@ -9,6 +9,48 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      contests: {
+        Row: {
+          created_at: string | null
+          current_participants: number | null
+          description: string | null
+          end_time: string
+          entry_fee: number
+          id: string
+          max_participants: number | null
+          prize_pool: number
+          start_time: string
+          status: string | null
+          title: string
+        }
+        Insert: {
+          created_at?: string | null
+          current_participants?: number | null
+          description?: string | null
+          end_time: string
+          entry_fee?: number
+          id?: string
+          max_participants?: number | null
+          prize_pool?: number
+          start_time: string
+          status?: string | null
+          title: string
+        }
+        Update: {
+          created_at?: string | null
+          current_participants?: number | null
+          description?: string | null
+          end_time?: string
+          entry_fee?: number
+          id?: string
+          max_participants?: number | null
+          prize_pool?: number
+          start_time?: string
+          status?: string | null
+          title?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -17,6 +59,7 @@ export type Database = {
           is_active: boolean
           updated_at: string
           username: string | null
+          wallet_balance: number
         }
         Insert: {
           avatar_url?: string | null
@@ -25,6 +68,7 @@ export type Database = {
           is_active?: boolean
           updated_at?: string
           username?: string | null
+          wallet_balance?: number
         }
         Update: {
           avatar_url?: string | null
@@ -33,8 +77,89 @@ export type Database = {
           is_active?: boolean
           updated_at?: string
           username?: string | null
+          wallet_balance?: number
         }
         Relationships: []
+      }
+      user_contests: {
+        Row: {
+          contest_id: string
+          id: string
+          joined_at: string | null
+          score: number | null
+          status: string | null
+          user_id: string
+        }
+        Insert: {
+          contest_id: string
+          id?: string
+          joined_at?: string | null
+          score?: number | null
+          status?: string | null
+          user_id: string
+        }
+        Update: {
+          contest_id?: string
+          id?: string
+          joined_at?: string | null
+          score?: number | null
+          status?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_contests_contest_id_fkey"
+            columns: ["contest_id"]
+            isOneToOne: false
+            referencedRelation: "contests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_contests_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wallet_transactions: {
+        Row: {
+          amount: number
+          created_at: string | null
+          id: string
+          reference_id: string | null
+          status: string | null
+          type: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          id?: string
+          reference_id?: string | null
+          status?: string | null
+          type: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          id?: string
+          reference_id?: string | null
+          status?: string | null
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wallet_transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
