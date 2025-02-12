@@ -1,6 +1,20 @@
+
 import { ArrowRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
 
 export const Hero = () => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const handleGetStarted = () => {
+    if (user) {
+      navigate('/contests');
+    } else {
+      navigate('/auth');
+    }
+  };
+
   return (
     <section className="pt-32 pb-20 px-4">
       <div className="max-w-7xl mx-auto text-center">
@@ -15,7 +29,7 @@ export const Hero = () => {
           Join skill-based contests and compete for real money prizes. Show off your gaming prowess and earn rewards.
         </p>
         <div className="animate-fade-up animation-delay-200 flex flex-col sm:flex-row gap-4 justify-center">
-          <button className="btn-primary inline-flex items-center">
+          <button onClick={handleGetStarted} className="btn-primary inline-flex items-center">
             Get Started <ArrowRight className="ml-2" size={20} />
           </button>
           <button className="px-6 py-3 text-secondary font-medium hover:bg-gray-100 rounded-full transition-colors">
