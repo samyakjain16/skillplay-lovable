@@ -66,7 +66,7 @@ const Auth = () => {
             : "You can now log in with your credentials.",
         });
         if (isLogin) {
-          navigate("/");
+          navigate("/gaming"); // Changed from "/" to "/gaming"
         } else {
           setIsLogin(true);
         }
