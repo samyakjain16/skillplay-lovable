@@ -28,7 +28,6 @@ const Auth = () => {
           <SupabaseAuth 
             supabaseClient={supabase}
             appearance={{ theme: ThemeSupa }}
-            providers={['google']}
             redirectTo={`${window.location.origin}/auth/callback`}
           />
         </div>
