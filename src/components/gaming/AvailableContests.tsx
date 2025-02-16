@@ -2,7 +2,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { ContestCard } from "./ContestCard/ContestCard";
+import { ContestCard } from "./ContestCard";
 import { useJoinContest } from "@/hooks/useJoinContest";
 import { useContestRealtime } from "@/hooks/useContestRealtime";
 
@@ -63,11 +63,20 @@ export const AvailableContests = () => {
     return <div>Loading contests...</div>;
   }
 
-  // Filter out contests that are either full or already joined by the user
-  const availableContests = contests?.filter(contest => 
-    !joinedContests?.includes(contest.id) && 
-    contest.current_participants < contest.max_participants
-  );
+  // Filter out contests that:
+  // 1. Are either full or already joined by the user
+  // 2. Have reached their start time but haven't been joined by the user
+  const availableContests = contests?.filter(contest => {
+    const isJoined = joinedContests?.includes(contest.id);
+    const isFull = contest.current_participants >= contest.max_participants;
+    const hasStarted = new Date(contest.start_time) <= new Date();
+    
+    // Only show contests that:
+    // - Haven't started yet, OR
+    // - Have started but the user is already in them
+    return (!hasStarted || (hasStarted && isJoined)) && 
+           (!isJoined && !isFull);
+  });
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
