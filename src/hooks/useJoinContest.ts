@@ -147,6 +147,7 @@ export const useJoinContest = (user: User | null) => {
       });
       // Invalidate all relevant queries to update UI
       queryClient.invalidateQueries({ queryKey: ["available-contests"] });
+      queryClient.invalidateQueries({ queryKey: ["my-contests"] }); // Add this line to invalidate my-contests query
       queryClient.invalidateQueries({ queryKey: ["profile"] });
       queryClient.invalidateQueries({ queryKey: ["joined-contests"] });
     },
