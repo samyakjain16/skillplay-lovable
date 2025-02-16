@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { User } from "@supabase/supabase-js";
+import { Database } from "@/integrations/supabase/types";
 
 interface JoinContestParams {
   p_user_id: string;
@@ -22,7 +23,7 @@ export const useJoinContest = (user: User | null) => {
     mutationFn: async (contestId: string) => {
       if (!user?.id) throw new Error("User not authenticated");
 
-      const { data, error } = await supabase.rpc<JoinContestResponse>(
+      const { data, error } = await supabase.rpc<'join_contest', JoinContestResponse>(
         'join_contest',
         {
           p_user_id: user.id,
@@ -32,8 +33,9 @@ export const useJoinContest = (user: User | null) => {
 
       if (error) throw error;
       
-      if (!data?.success) {
-        throw new Error(data?.error || 'Failed to join contest');
+      const response = data as JoinContestResponse;
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to join contest');
       }
 
       return { success: true };
