@@ -43,6 +43,10 @@ export const MyContests = () => {
     mutationFn: async (contestId: string) => {
       console.log('Starting contest mutation for:', contestId);
       
+      if (!user?.id) {
+        throw new Error('User not authenticated');
+      }
+
       // First update the contest status
       const { error: updateError } = await supabase
         .from("contests")
@@ -54,15 +58,33 @@ export const MyContests = () => {
         throw updateError;
       }
 
-      // Initialize or update user_contests entry
+      // First check if user already has an entry
+      const { data: existingEntry, error: fetchError } = await supabase
+        .from("user_contests")
+        .select("*")
+        .eq("contest_id", contestId)
+        .eq("user_id", user.id)
+        .single();
+
+      if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+        console.error('Error fetching user contest:', fetchError);
+        throw fetchError;
+      }
+
+      // If entry exists, update it. If not, create new entry
       const { error: userContestError } = await supabase
         .from("user_contests")
         .upsert({
+          id: existingEntry?.id, // This will be undefined for new entries
           contest_id: contestId,
-          user_id: user?.id,
+          user_id: user.id,
           status: 'active',
           current_game_index: 0,
-          current_game_score: 0
+          current_game_score: 0,
+          // Only set joined_at for new entries
+          ...((!existingEntry && { joined_at: new Date().toISOString() }))
+        }, {
+          onConflict: 'user_id,contest_id'
         });
 
       if (userContestError) {
@@ -81,7 +103,7 @@ export const MyContests = () => {
       // Navigate to the contest page
       navigate(`/contest/${contestId}`);
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       console.error('Start contest error:', error);
       toast({
         variant: "destructive",
