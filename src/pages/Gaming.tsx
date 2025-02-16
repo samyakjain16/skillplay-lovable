@@ -24,15 +24,16 @@ const Gaming = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Enhanced query configuration with better caching strategy
   const { data: profile, isLoading: isLoadingBalance } = useQuery({
-    queryKey: ["profile"],
+    queryKey: ["profile", user?.id],
     queryFn: async () => {
       if (!user) return null;
       const { data, error } = await supabase
         .from("profiles")
         .select("wallet_balance")
         .eq("id", user.id)
-        .single();
+        .maybeSingle();
 
       if (error) {
         toast({
@@ -45,8 +46,12 @@ const Gaming = () => {
       return data;
     },
     enabled: !!user,
-    staleTime: 1000, // Consider data fresh for 1 second
-    gcTime: 5 * 60 * 1000, // Keep data in cache for 5 minutes (formerly cacheTime)
+    staleTime: Infinity, // Keep data fresh indefinitely unless explicitly invalidated
+    gcTime: 5 * 60 * 1000, // Keep unused data in cache for 5 minutes
+    initialData: () => {
+      // Use existing cached data if available
+      return queryClient.getQueryData(["profile", user?.id]);
+    }
   });
 
   // Set up real-time subscription for wallet balance updates
@@ -66,16 +71,13 @@ const Gaming = () => {
         (payload) => {
           // Update the cached wallet balance
           if (payload.new) {
-            queryClient.setQueryData(["profile"], {
+            queryClient.setQueryData(["profile", user?.id], {
               wallet_balance: (payload.new as any).wallet_balance
             });
           }
         }
       )
       .subscribe();
-
-    // Fetch initial data
-    queryClient.invalidateQueries({ queryKey: ["profile"] });
 
     return () => {
       supabase.removeChannel(channel);
