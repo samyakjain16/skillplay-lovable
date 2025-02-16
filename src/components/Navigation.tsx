@@ -13,7 +13,7 @@ export const Navigation = () => {
 
   const handleAuthAction = () => {
     if (user) {
-      navigate('/gaming'); // Changed from '/contests' to '/gaming'
+      navigate('/gaming');
     } else {
       navigate('/auth');
     }
@@ -33,18 +33,12 @@ export const Navigation = () => {
           </div>
           
           <div className="hidden md:flex items-center space-x-8">
-            {!isGamingSection && (
-              <>
-                <a href="/" className="nav-link">Home</a>
-                {user && (
-                  <Button onClick={handleAuthAction}>Go to Contests</Button>
-                )}
-              </>
+            {isGamingSection && user && (
+              <Button onClick={() => navigate('/gaming')}>Go to Contests</Button>
             )}
-            {user && (
+            {user ? (
               <Button variant="outline" onClick={() => signOut()}>Sign Out</Button>
-            )}
-            {!user && (
+            ) : (
               <Button onClick={handleAuthAction}>Start Playing</Button>
             )}
           </div>
@@ -63,13 +57,8 @@ export const Navigation = () => {
       {isOpen && (
         <div className="md:hidden">
           <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-            {!isGamingSection && (
-              <>
-                <a href="/" className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-gray-900">Home</a>
-                {user && (
-                  <Button className="w-full" onClick={handleAuthAction}>Go to Contests</Button>
-                )}
-              </>
+            {isGamingSection && user && (
+              <Button className="w-full" onClick={() => navigate('/gaming')}>Go to Contests</Button>
             )}
             {user ? (
               <Button className="w-full mt-2" variant="outline" onClick={() => signOut()}>Sign Out</Button>

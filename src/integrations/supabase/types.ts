@@ -18,7 +18,9 @@ export type Database = {
           entry_fee: number
           id: string
           max_participants: number | null
+          prize_distribution_type: string
           prize_pool: number
+          series_count: number
           start_time: string
           status: string | null
           title: string
@@ -31,7 +33,9 @@ export type Database = {
           entry_fee?: number
           id?: string
           max_participants?: number | null
+          prize_distribution_type?: string
           prize_pool?: number
+          series_count?: number
           start_time: string
           status?: string | null
           title: string
@@ -44,7 +48,9 @@ export type Database = {
           entry_fee?: number
           id?: string
           max_participants?: number | null
+          prize_distribution_type?: string
           prize_pool?: number
+          series_count?: number
           start_time?: string
           status?: string | null
           title?: string
