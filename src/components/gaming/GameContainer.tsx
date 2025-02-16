@@ -6,6 +6,9 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { CountdownTimer } from "./CountdownTimer";
+import type { Database } from "@/integrations/supabase/types";
+
+type PlayerGameProgress = Database["public"]["Tables"]["player_game_progress"]["Insert"];
 
 interface GameContent {
   id: string;
@@ -52,17 +55,26 @@ export const GameContainer = ({ contestId, onGameComplete }: GameContainerProps)
     const currentGame = contestGames[currentGameIndex];
     const timeSpent = gameStartTime ? Math.floor((Date.now() - gameStartTime.getTime()) / 1000) : 30;
 
-    // Record the game progress
-    await supabase.from("player_game_progress").insert({
+    const progressData: PlayerGameProgress = {
       user_id: user.id,
       contest_id: contestId,
       game_content_id: currentGame.game_content_id,
       score: score,
       time_taken: timeSpent,
-      started_at: gameStartTime,
-      completed_at: new Date(),
+      started_at: gameStartTime?.toISOString(),
+      completed_at: new Date().toISOString(),
       is_correct: score > 0
-    });
+    };
+
+    // Record the game progress
+    const { error } = await supabase
+      .from("player_game_progress")
+      .insert(progressData);
+
+    if (error) {
+      console.error("Error recording game progress:", error);
+      return;
+    }
 
     onGameComplete(score);
     
