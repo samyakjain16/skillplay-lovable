@@ -11,131 +11,16 @@ export const useJoinContest = (user: User | null) => {
   return useMutation({
     mutationFn: async (contestId: string) => {
       if (!user?.id) throw new Error("User not authenticated");
+
+      const { data, error } = await supabase.rpc('join_contest', {
+        p_user_id: user.id,
+        p_contest_id: contestId
+      });
+
+      if (error) throw error;
       
-      // First check if user has already joined
-      const { data: existingParticipation } = await supabase
-        .from("user_contests")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("contest_id", contestId)
-        .maybeSingle();
-
-      if (existingParticipation) {
-        throw new Error("You have already joined this contest");
-      }
-
-      // Get contest details
-      const { data: contest, error: contestError } = await supabase
-        .from("contests")
-        .select("entry_fee, current_participants, max_participants")
-        .eq("id", contestId)
-        .maybeSingle();
-
-      if (contestError) throw contestError;
-      if (!contest) throw new Error("Contest not found");
-      
-      // Check if contest is full
-      if (contest.current_participants >= contest.max_participants) {
-        throw new Error("Contest is full");
-      }
-
-      // Check wallet balance
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("wallet_balance")
-        .eq("id", user.id)
-        .maybeSingle();
-
-      if (profileError) throw profileError;
-      if (!profile) throw new Error("Profile not found");
-      if (profile.wallet_balance < contest.entry_fee) {
-        throw new Error("Insufficient balance");
-      }
-
-      // Create participation record first
-      const { error: participationError } = await supabase
-        .from("user_contests")
-        .insert([{ 
-          user_id: user.id, 
-          contest_id: contestId,
-          status: 'active'
-        }]);
-
-      if (participationError) {
-        throw participationError;
-      }
-
-      // Update contest participants count
-      const { error: updateError } = await supabase
-        .from("contests")
-        .update({ 
-          current_participants: contest.current_participants + 1 
-        })
-        .eq("id", contestId);
-
-      if (updateError) {
-        // Rollback participation if update fails
-        await supabase
-          .from("user_contests")
-          .delete()
-          .eq("user_id", user.id)
-          .eq("contest_id", contestId);
-          
-        throw updateError;
-      }
-
-      // Create wallet transaction
-      const { error: transactionError } = await supabase
-        .from("wallet_transactions")
-        .insert([{
-          user_id: user.id,
-          amount: -contest.entry_fee,
-          type: "contest_entry",
-          reference_id: contestId,
-        }]);
-
-      if (transactionError) {
-        // Rollback everything if transaction fails
-        await supabase
-          .from("user_contests")
-          .delete()
-          .eq("user_id", user.id)
-          .eq("contest_id", contestId);
-          
-        await supabase
-          .from("contests")
-          .update({ current_participants: contest.current_participants })
-          .eq("id", contestId);
-          
-        throw transactionError;
-      }
-
-      // Update user's wallet balance
-      const { error: walletError } = await supabase
-        .from("profiles")
-        .update({ wallet_balance: profile.wallet_balance - contest.entry_fee })
-        .eq("id", user.id);
-
-      if (walletError) {
-        // Rollback everything if wallet update fails
-        await supabase
-          .from("user_contests")
-          .delete()
-          .eq("user_id", user.id)
-          .eq("contest_id", contestId);
-          
-        await supabase
-          .from("contests")
-          .update({ current_participants: contest.current_participants })
-          .eq("id", contestId);
-          
-        await supabase
-          .from("wallet_transactions")
-          .delete()
-          .eq("user_id", user.id)
-          .eq("reference_id", contestId);
-          
-        throw walletError;
+      if (!data.success) {
+        throw new Error(data.error);
       }
 
       return { success: true };
@@ -147,7 +32,7 @@ export const useJoinContest = (user: User | null) => {
       });
       // Invalidate all relevant queries to update UI
       queryClient.invalidateQueries({ queryKey: ["available-contests"] });
-      queryClient.invalidateQueries({ queryKey: ["my-contests"] }); // Add this line to invalidate my-contests query
+      queryClient.invalidateQueries({ queryKey: ["my-contests"] });
       queryClient.invalidateQueries({ queryKey: ["profile"] });
       queryClient.invalidateQueries({ queryKey: ["joined-contests"] });
     },

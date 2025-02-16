@@ -175,6 +175,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      join_contest: {
+        Args: {
+          p_user_id: string
+          p_contest_id: string
+        }
+        Returns: Json
+      }
       update_completed_contests: {
         Args: Record<PropertyKey, never>
         Returns: undefined
