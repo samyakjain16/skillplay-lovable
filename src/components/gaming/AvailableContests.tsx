@@ -1,3 +1,4 @@
+
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
@@ -7,6 +8,22 @@ import { Trophy, Users, Clock, Award, Hash, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 import { useEffect } from "react";
+import { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
+
+type Contest = {
+  id: string;
+  title: string;
+  description: string;
+  series_count: number;
+  max_participants: number;
+  current_participants: number;
+  status: string;
+  start_time: string;
+  end_time: string;
+  prize_pool: number;
+  entry_fee: number;
+  prize_distribution_type: string;
+};
 
 export const AvailableContests = () => {
   const { user } = useAuth();
@@ -24,18 +41,18 @@ export const AvailableContests = () => {
           schema: 'public',
           table: 'contests'
         },
-        (payload) => {
+        (payload: RealtimePostgresChangesPayload<Contest>) => {
           // Update the cache with the new data
-          queryClient.setQueryData(['available-contests'], (oldData: any) => {
+          queryClient.setQueryData(['available-contests'], (oldData: Contest[] | undefined) => {
             if (!oldData) return oldData;
             
             // If it's a DELETE, remove the contest
             if (payload.eventType === 'DELETE') {
-              return oldData.filter((contest: any) => contest.id !== payload.old.id);
+              return oldData.filter((contest) => contest.id !== payload.old.id);
             }
             
             // For INSERT or UPDATE, update the contest data
-            const updatedContests = oldData.map((contest: any) => {
+            const updatedContests = oldData.map((contest) => {
               if (contest.id === payload.new.id) {
                 return { ...contest, ...payload.new };
               }
@@ -43,7 +60,7 @@ export const AvailableContests = () => {
             });
             
             // If it's an INSERT and the contest wasn't found in the map
-            if (payload.eventType === 'INSERT' && !updatedContests.find((c: any) => c.id === payload.new.id)) {
+            if (payload.eventType === 'INSERT' && !updatedContests.find((c) => c.id === payload.new.id)) {
               updatedContests.push(payload.new);
             }
             
