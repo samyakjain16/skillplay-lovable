@@ -4,6 +4,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { User } from "@supabase/supabase-js";
 
+interface JoinContestParams {
+  p_user_id: string;
+  p_contest_id: string;
+}
+
 interface JoinContestResponse {
   success: boolean;
   error?: string;
@@ -17,10 +22,13 @@ export const useJoinContest = (user: User | null) => {
     mutationFn: async (contestId: string) => {
       if (!user?.id) throw new Error("User not authenticated");
 
-      const { data, error } = await supabase.rpc<JoinContestResponse>('join_contest', {
-        p_user_id: user.id,
-        p_contest_id: contestId
-      });
+      const { data, error } = await supabase.rpc<JoinContestResponse, JoinContestParams>(
+        'join_contest',
+        {
+          p_user_id: user.id,
+          p_contest_id: contestId
+        }
+      );
 
       if (error) throw error;
       
