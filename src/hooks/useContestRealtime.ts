@@ -12,8 +12,19 @@ interface Contest {
   end_time: string;
 }
 
-interface Participation {
+interface MyContestParticipation {
+  id: string;
   contest: Contest;
+}
+
+interface AvailableContest extends Contest {
+  description: string;
+  title: string;
+  prize_pool: number;
+  entry_fee: number;
+  max_participants: number;
+  prize_distribution_type: string;
+  series_count: number;
 }
 
 export const useContestRealtime = () => {
@@ -30,14 +41,14 @@ export const useContestRealtime = () => {
           table: 'contests'
         },
         (payload: RealtimePostgresChangesPayload<Contest>) => {
-          // Update both my-contests and available-contests queries
-          ['my-contests', 'available-contests'].forEach(queryKey => {
-            queryClient.setQueryData([queryKey], (oldData: Participation[] | undefined) => {
+          const newContest = payload.new as Contest;
+          if (!newContest?.id) return;
+
+          // Update my-contests query
+          queryClient.setQueryData<MyContestParticipation[] | undefined>(
+            ['my-contests'], 
+            (oldData) => {
               if (!oldData) return oldData;
-              
-              const newContest = payload.new as Contest;
-              if (!newContest?.id) return oldData;
-              
               return oldData.map((participation) => {
                 if (participation.contest.id === newContest.id) {
                   return {
@@ -47,8 +58,22 @@ export const useContestRealtime = () => {
                 }
                 return participation;
               });
-            });
-          });
+            }
+          );
+
+          // Update available-contests query
+          queryClient.setQueryData<AvailableContest[] | undefined>(
+            ['available-contests'], 
+            (oldData) => {
+              if (!oldData) return oldData;
+              return oldData.map((contest) => {
+                if (contest.id === newContest.id) {
+                  return { ...contest, ...newContest };
+                }
+                return contest;
+              });
+            }
+          );
         }
       )
       .subscribe();
