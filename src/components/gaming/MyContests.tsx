@@ -1,16 +1,14 @@
-
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
-import { Trophy, Users, Clock, Award, Hash, Loader2 } from "lucide-react";
+import { Trophy, Users, Clock, Award, Hash } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 import { useEffect } from "react";
 import { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
+import { ContestStatusButton } from "./ContestStatusButton";
 
-// Define the type for contest data
 type Contest = {
   id: string;
   title: string;
@@ -26,7 +24,6 @@ type Contest = {
   prize_distribution_type: string;
 };
 
-// Define the type for participation data
 type Participation = {
   id: string;
   user_id: string;
@@ -138,60 +135,10 @@ export const MyContests = () => {
     );
   }
 
-  const getContestStatus = (contest: any) => {
-    const now = new Date();
-    const startTime = new Date(contest.start_time);
-    const isFullyBooked = contest.current_participants >= contest.max_participants;
-    
-    if (contest.status === "in_progress") {
-      return {
-        text: "In Progress",
-        disabled: true,
-        variant: "secondary" as const,
-      };
-    }
-    
-    if (startTime <= now && isFullyBooked) {
-      return {
-        text: "Start Contest",
-        disabled: false,
-        variant: "default" as const,
-        action: () => startContestMutation.mutate(contest.id),
-        loading: startContestMutation.isPending,
-      };
-    }
-    
-    if (startTime <= now) {
-      return {
-        text: `Waiting for Players (${contest.current_participants}/${contest.max_participants})`,
-        disabled: true,
-        variant: "secondary" as const,
-      };
-    }
-    
-    const timeUntilStart = startTime.getTime() - now.getTime();
-    const minutesUntilStart = Math.floor(timeUntilStart / (1000 * 60));
-    
-    if (minutesUntilStart <= 30) {
-      return {
-        text: `Starting in ${minutesUntilStart} minutes`,
-        disabled: true,
-        variant: "secondary" as const,
-      };
-    }
-    
-    return {
-      text: `Starts at ${format(startTime, 'h:mm a')}`,
-      disabled: true,
-      variant: "secondary" as const,
-    };
-  };
-
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {contests?.map((participation) => {
         const totalPrizePool = participation.contest.current_participants * participation.contest.entry_fee;
-        const status = getContestStatus(participation.contest);
         
         return (
           <Card key={participation.id} className="w-full">
@@ -244,21 +191,19 @@ export const MyContests = () => {
                 </div>
 
                 <div className="pt-4">
-                  <Button 
-                    className="w-full"
-                    variant={status.variant}
-                    disabled={status.disabled}
-                    onClick={status.action}
-                  >
-                    {status.loading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Starting...
-                      </>
-                    ) : (
-                      status.text
-                    )}
-                  </Button>
+                  <ContestStatusButton 
+                    contest={participation.contest}
+                    onClick={() => {
+                      const now = new Date();
+                      const startTime = new Date(participation.contest.start_time);
+                      const isFullyBooked = participation.contest.current_participants >= participation.contest.max_participants;
+                      
+                      if (startTime <= now && isFullyBooked && participation.contest.status === 'upcoming') {
+                        startContestMutation.mutate(participation.contest.id);
+                      }
+                    }}
+                    loading={startContestMutation.isPending}
+                  />
                 </div>
               </div>
             </CardContent>
