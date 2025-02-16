@@ -1,7 +1,7 @@
 
 import { Card, CardContent } from "@/components/ui/card";
-import { ContestDetails } from "./ContestDetails";
-import { ContestStatusButton } from "../ContestStatusButton";
+import { ContestDetails } from "./ContestCard/ContestDetails";
+import { ContestStatusButton } from "./ContestStatusButton";
 
 interface Contest {
   id: string;
@@ -22,9 +22,11 @@ interface ContestCardProps {
   contest: Contest;
   onStart?: (contestId: string) => void;
   isStarting?: boolean;
+  onJoin?: (contestId: string) => void;
+  isJoining?: boolean;
 }
 
-export const ContestCard = ({ contest, onStart, isStarting }: ContestCardProps) => {
+export const ContestCard = ({ contest, onStart, isStarting, onJoin, isJoining }: ContestCardProps) => {
   const totalPrizePool = contest.current_participants * contest.entry_fee;
   
   return (
@@ -54,9 +56,11 @@ export const ContestCard = ({ contest, onStart, isStarting }: ContestCardProps) 
                 
                 if (startTime <= now && isFullyBooked && contest.status === 'upcoming') {
                   onStart?.(contest.id);
+                } else if (!isFullyBooked && onJoin) {
+                  onJoin(contest.id);
                 }
               }}
-              loading={isStarting}
+              loading={isStarting || isJoining}
             />
           </div>
         </div>
