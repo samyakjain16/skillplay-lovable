@@ -40,13 +40,18 @@ export const CountdownTimer = ({ targetDate, onEnd }: CountdownTimerProps) => {
     };
 
     // Initial calculation
-    calculateTimeLeft();
+    const initialTimeLeft = calculateTimeLeft();
+    if (initialTimeLeft !== null) {
+      setTimeLeft(initialTimeLeft);
+    }
 
     // Update every second
     const timer = setInterval(() => {
       const result = calculateTimeLeft();
       if (result === null) {
         clearInterval(timer);
+      } else {
+        setTimeLeft(result);
       }
     }, 1000);
 
