@@ -31,8 +31,8 @@ export const ContestStatusButton = ({ contest, onClick, loading, disabled, isInM
   };
 
   const getButtonContent = () => {
-    // Check for completed contests first - this should take precedence over other states
-    if (now > endTime || contest.status === 'completed') {
+    // Check for completed contests first
+    if (contest.status === 'completed' || now > endTime) {
       return {
         text: "Completed",
         variant: "secondary" as const,
@@ -96,7 +96,7 @@ export const ContestStatusButton = ({ contest, onClick, loading, disabled, isInM
   return (
     <div className="relative w-full">
       <Button 
-        className={`w-full relative overflow-hidden ${now > endTime ? 'bg-gray-300 hover:bg-gray-300' : ''}`}
+        className={`w-full relative overflow-hidden ${buttonContent.disabled ? 'bg-gray-300 hover:bg-gray-300' : ''}`}
         variant={buttonContent.variant}
         disabled={disabled || buttonContent.disabled}
         onClick={onClick}

@@ -51,7 +51,6 @@ export const AvailableContests = () => {
       const { data, error } = await supabase
         .from("contests")
         .select("*")
-        .eq("status", "upcoming")
         .order("start_time", { ascending: true });
 
       if (error) throw error;
@@ -63,19 +62,15 @@ export const AvailableContests = () => {
     return <div>Loading contests...</div>;
   }
 
-  // Filter out contests that:
-  // 1. Are either full or already joined by the user
-  // 2. Have reached their start time but haven't been joined by the user
+  // Filter out contests that have been joined by the user
   const availableContests = contests?.filter(contest => {
     const isJoined = joinedContests?.includes(contest.id);
     const isFull = contest.current_participants >= contest.max_participants;
-    const hasStarted = new Date(contest.start_time) <= new Date();
     
-    // Only show contests that:
-    // - Haven't started yet, OR
-    // - Have started but the user is already in them
-    return (!hasStarted || (hasStarted && isJoined)) && 
-           (!isJoined && !isFull);
+    // Show contests that:
+    // 1. Haven't been joined by the user
+    // 2. Aren't full (unless already joined)
+    return !isJoined && !isFull;
   });
 
   return (
