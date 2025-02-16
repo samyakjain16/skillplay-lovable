@@ -2,7 +2,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { ContestCard } from "./ContestCard";
+import { ContestCard } from "./ContestCard/ContestCard";
 import { useJoinContest } from "@/hooks/useJoinContest";
 import { useContestRealtime } from "@/hooks/useContestRealtime";
 
@@ -75,7 +75,7 @@ export const AvailableContests = () => {
         <ContestCard
           key={contest.id}
           contest={contest}
-          onJoin={joinContestMutation.mutate}
+          onJoin={(contestId) => joinContestMutation.mutate(contestId)}
           isJoining={joinContestMutation.isPending}
         />
       ))}
