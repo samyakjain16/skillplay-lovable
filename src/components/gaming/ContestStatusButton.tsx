@@ -61,9 +61,11 @@ export const ContestStatusButton = ({ contest, onClick, loading, disabled, isInM
   }, [contest.status, calculateProgress]);
 
   const now = new Date();
+  const startTime = new Date(contest.start_time);
   const endTime = new Date(contest.end_time);
   const isContestEnded = now > endTime || contest.status === 'completed';
   const isContestFull = contest.current_participants >= contest.max_participants;
+  const hasContestStarted = now >= startTime;
 
   const getButtonContent = () => {
     // Check for completed contests first
@@ -79,6 +81,16 @@ export const ContestStatusButton = ({ contest, onClick, loading, disabled, isInM
 
     // For My Contests section
     if (isInMyContests) {
+      if (!hasContestStarted) {
+        return {
+          text: "Pending",
+          variant: "secondary" as const,
+          disabled: true,
+          showProgress: false,
+          customClass: ""
+        };
+      }
+      
       if (contest.status === 'in_progress') {
         return {
           text: "Start Contest",
@@ -88,7 +100,8 @@ export const ContestStatusButton = ({ contest, onClick, loading, disabled, isInM
           customClass: ""
         };
       }
-      if (contest.status === 'upcoming') {
+
+      if (contest.status === 'upcoming' && hasContestStarted) {
         return {
           text: "Start Contest",
           variant: "default" as const,
@@ -97,6 +110,7 @@ export const ContestStatusButton = ({ contest, onClick, loading, disabled, isInM
           customClass: ""
         };
       }
+
       return {
         text: "Pending",
         variant: "secondary" as const,
@@ -117,11 +131,21 @@ export const ContestStatusButton = ({ contest, onClick, loading, disabled, isInM
       };
     }
 
+    if (contest.status === 'in_progress') {
+      return {
+        text: "Join Contest",
+        variant: "default" as const,
+        disabled: false,
+        showProgress: true,
+        customClass: ""
+      };
+    }
+
     return {
       text: "Join Contest",
       variant: "default" as const,
       disabled: false,
-      showProgress: contest.status === 'in_progress',
+      showProgress: false,
       customClass: ""
     };
   };
