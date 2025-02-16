@@ -63,6 +63,7 @@ export type Database = {
           created_at: string
           id: string
           is_active: boolean
+          is_admin: boolean | null
           updated_at: string
           username: string | null
           wallet_balance: number
@@ -72,6 +73,7 @@ export type Database = {
           created_at?: string
           id: string
           is_active?: boolean
+          is_admin?: boolean | null
           updated_at?: string
           username?: string | null
           wallet_balance?: number
@@ -81,6 +83,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_active?: boolean
+          is_admin?: boolean | null
           updated_at?: string
           username?: string | null
           wallet_balance?: number
