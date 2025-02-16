@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
@@ -20,7 +21,7 @@ interface GameContent {
 
 interface GameContainerProps {
   contestId: string;
-  onGameComplete: (score: number) => void;
+  onGameComplete: (score: number, isFinalGame: boolean) => void;
 }
 
 export const GameContainer = ({ contestId, onGameComplete }: GameContainerProps) => {
@@ -56,6 +57,7 @@ export const GameContainer = ({ contestId, onGameComplete }: GameContainerProps)
 
     const currentGame = contestGames[currentGameIndex];
     const timeSpent = gameStartTime ? Math.floor((Date.now() - gameStartTime.getTime()) / 1000) : 30;
+    const isFinalGame = currentGameIndex === contestGames.length - 1;
 
     const progressData: PlayerGameProgress = {
       user_id: user.id,
@@ -77,9 +79,9 @@ export const GameContainer = ({ contestId, onGameComplete }: GameContainerProps)
       return;
     }
 
-    onGameComplete(score);
+    onGameComplete(score, isFinalGame);
     
-    if (currentGameIndex < contestGames.length - 1) {
+    if (!isFinalGame) {
       setCurrentGameIndex(prev => prev + 1);
       setGameStartTime(new Date());
     }
