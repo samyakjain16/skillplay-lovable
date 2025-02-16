@@ -3,11 +3,13 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Session } from '@supabase/supabase-js';
 import { useToast } from '@/components/ui/use-toast';
+import { useNavigate } from 'react-router-dom';
 
 export const useAuth = () => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
     // Get initial session
@@ -50,6 +52,9 @@ export const useAuth = () => {
         title: "Signed out",
         description: "You have been successfully signed out"
       });
+
+      // Navigate to home page after successful sign out
+      navigate('/');
     } catch (error) {
       console.error('Error during sign out:', error);
       // Ensure user sees success message even if there was an error
@@ -58,6 +63,8 @@ export const useAuth = () => {
         title: "Signed out",
         description: "Session has been cleared"
       });
+      // Still navigate to home page even if there was an error
+      navigate('/');
     }
   };
 
