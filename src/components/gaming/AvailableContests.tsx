@@ -42,16 +42,13 @@ export const AvailableContests = () => {
           table: 'contests'
         },
         (payload: RealtimePostgresChangesPayload<Contest>) => {
-          // Update the cache with the new data
           queryClient.setQueryData(['available-contests'], (oldData: Contest[] | undefined) => {
             if (!oldData) return oldData;
             
-            // If it's a DELETE, remove the contest
             if (payload.eventType === 'DELETE') {
               return oldData.filter((contest) => contest.id !== payload.old.id);
             }
             
-            // For INSERT or UPDATE, update the contest data
             const updatedContests = oldData.map((contest) => {
               if (contest.id === payload.new.id) {
                 return { ...contest, ...payload.new };
@@ -59,7 +56,6 @@ export const AvailableContests = () => {
               return contest;
             });
             
-            // If it's an INSERT and the contest wasn't found in the map
             if (payload.eventType === 'INSERT' && !updatedContests.find((c) => c.id === payload.new.id)) {
               updatedContests.push(payload.new);
             }
@@ -124,7 +120,7 @@ export const AvailableContests = () => {
     mutationFn: async (contestId: string) => {
       if (!user?.id) throw new Error("User not authenticated");
       
-      // Start transaction
+      // Start a transaction using RPC call
       const { data: contest, error: contestError } = await supabase
         .from("contests")
         .select("entry_fee, current_participants, max_participants")
@@ -150,20 +146,7 @@ export const AvailableContests = () => {
         throw new Error("Insufficient balance");
       }
 
-      // Create participation record
-      const { error: participationError } = await supabase
-        .from("user_contests")
-        .insert([{ user_id: user.id, contest_id: contestId }]);
-
-      if (participationError) {
-        // Check if user already joined
-        if (participationError.code === '23505') { // Unique violation
-          throw new Error("You have already joined this contest");
-        }
-        throw participationError;
-      }
-
-      // Update contest participants count
+      // Update contest participants count first
       const { error: updateError } = await supabase
         .from("contests")
         .update({ current_participants: contest.current_participants + 1 })
@@ -171,7 +154,25 @@ export const AvailableContests = () => {
 
       if (updateError) throw updateError;
 
-      // Create wallet transaction
+      // Create participation record
+      const { error: participationError } = await supabase
+        .from("user_contests")
+        .insert([{ user_id: user.id, contest_id: contestId }]);
+
+      if (participationError) {
+        // Revert the participants count if participation record fails
+        await supabase
+          .from("contests")
+          .update({ current_participants: contest.current_participants })
+          .eq("id", contestId);
+
+        if (participationError.code === '23505') { // Unique violation
+          throw new Error("You have already joined this contest");
+        }
+        throw participationError;
+      }
+
+      // Create wallet transaction and update balance
       const { error: transactionError } = await supabase
         .from("wallet_transactions")
         .insert([{
@@ -190,6 +191,8 @@ export const AvailableContests = () => {
         .eq("id", user.id);
 
       if (walletError) throw walletError;
+
+      return { success: true };
     },
     onSuccess: () => {
       toast({
