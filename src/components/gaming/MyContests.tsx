@@ -93,7 +93,17 @@ export const MyContests = () => {
         .order("joined_at", { ascending: false });
 
       if (error) throw error;
-      return data as Participation[];
+
+      // Update the status of contests that have ended
+      const updatedData = data.map((participation: Participation) => {
+        const endTime = new Date(participation.contest.end_time);
+        if (endTime < now && participation.contest.status !== 'completed') {
+          participation.contest.status = 'completed';
+        }
+        return participation;
+      });
+
+      return updatedData as Participation[];
     },
     enabled: !!user?.id,
   });
