@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { ContestCard } from "./ContestCard/ContestCard";
+import { ContestCard } from "./ContestCard";
 import { useContestRealtime } from "@/hooks/useContestRealtime";
 
 type Contest = {
@@ -107,6 +107,7 @@ export const MyContests = () => {
           contest={participation.contest}
           onStart={startContestMutation.mutate}
           isStarting={startContestMutation.isPending}
+          isInMyContests={true}
         />
       ))}
     </div>

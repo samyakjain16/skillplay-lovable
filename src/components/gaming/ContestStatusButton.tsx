@@ -13,9 +13,10 @@ interface ContestStatusButtonProps {
   onClick?: () => void;
   loading?: boolean;
   disabled?: boolean;
+  isInMyContests?: boolean;
 }
 
-export const ContestStatusButton = ({ contest, onClick, loading, disabled }: ContestStatusButtonProps) => {
+export const ContestStatusButton = ({ contest, onClick, loading, disabled, isInMyContests }: ContestStatusButtonProps) => {
   const now = new Date();
   const startTime = new Date(contest.start_time);
   const endTime = new Date(contest.end_time);
@@ -50,7 +51,25 @@ export const ContestStatusButton = ({ contest, onClick, loading, disabled }: Con
       };
     }
 
-    // Contest is ready to start (all players joined)
+    // For My Contests section
+    if (isInMyContests) {
+      if (startTime <= now && contest.status === 'upcoming') {
+        return {
+          text: "Start Contest",
+          variant: "default" as const,
+          disabled: false,
+          showProgress: false
+        };
+      }
+      return {
+        text: "Pending",
+        variant: "secondary" as const,
+        disabled: true,
+        showProgress: false
+      };
+    }
+
+    // For Available Contests section
     if (isFullyBooked && startTime <= now && contest.status === 'upcoming') {
       return {
         text: "Start Contest",
@@ -60,7 +79,6 @@ export const ContestStatusButton = ({ contest, onClick, loading, disabled }: Con
       };
     }
 
-    // Default state - Join Contest
     return {
       text: "Join Contest",
       variant: "default" as const,

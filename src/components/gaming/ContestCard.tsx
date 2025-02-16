@@ -24,9 +24,10 @@ interface ContestCardProps {
   isStarting?: boolean;
   onJoin?: (contestId: string) => void;
   isJoining?: boolean;
+  isInMyContests?: boolean;
 }
 
-export const ContestCard = ({ contest, onStart, isStarting, onJoin, isJoining }: ContestCardProps) => {
+export const ContestCard = ({ contest, onStart, isStarting, onJoin, isJoining, isInMyContests }: ContestCardProps) => {
   const totalPrizePool = contest.current_participants * contest.entry_fee;
   
   return (
@@ -61,6 +62,7 @@ export const ContestCard = ({ contest, onStart, isStarting, onJoin, isJoining }:
                 }
               }}
               loading={isStarting || isJoining}
+              isInMyContests={isInMyContests}
             />
           </div>
         </div>
