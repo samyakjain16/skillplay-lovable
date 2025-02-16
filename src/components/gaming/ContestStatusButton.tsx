@@ -44,6 +44,16 @@ export const ContestStatusButton = ({ contest, onClick, loading, disabled, isInM
 
     // Contest is in progress
     if (contest.status === 'in_progress') {
+      // For my contests section, allow starting even when in progress
+      if (isInMyContests && startTime <= now && now < endTime) {
+        return {
+          text: "Start Contest",
+          variant: "default" as const,
+          disabled: false,
+          showProgress: true,
+          customClass: ""
+        };
+      }
       return {
         text: "In Progress",
         variant: "secondary" as const,
@@ -123,8 +133,11 @@ export const ContestStatusButton = ({ contest, onClick, loading, disabled, isInM
             style={{ width: '100%' }}
           >
             <div 
-              className="h-full bg-primary transition-all duration-1000 ease-linear"
-              style={{ width: `${progressPercentage}%` }}
+              className="h-full bg-primary transition-all duration-1000"
+              style={{ 
+                width: `${progressPercentage}%`,
+                transition: 'width 1s linear'
+              }}
             />
           </div>
         )}
