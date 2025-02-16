@@ -5,6 +5,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { ContestCard } from "./ContestCard";
 import { useContestRealtime } from "@/hooks/useContestRealtime";
+import { useNavigate } from "react-router-dom";
 
 type Contest = {
   id: string;
@@ -33,6 +34,7 @@ export const MyContests = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   // Set up realtime subscription
   useContestRealtime();
@@ -45,13 +47,16 @@ export const MyContests = () => {
         .eq("id", contestId);
 
       if (error) throw error;
+      return contestId; // Return contestId for use in onSuccess
     },
-    onSuccess: () => {
+    onSuccess: (contestId) => {
       toast({
         title: "Contest Started!",
         description: "The contest has begun. Good luck!",
       });
       queryClient.invalidateQueries({ queryKey: ["my-contests"] });
+      // Navigate to the contest page
+      navigate(`/contest/${contestId}`);
     },
     onError: () => {
       toast({
