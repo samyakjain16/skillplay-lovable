@@ -37,7 +37,8 @@ export const ContestStatusButton = ({ contest, onClick, loading, disabled, isInM
         text: "Completed",
         variant: "secondary" as const,
         disabled: true,
-        showProgress: false
+        showProgress: false,
+        customClass: "bg-[#333333] hover:bg-[#333333] text-white"
       };
     }
 
@@ -47,7 +48,8 @@ export const ContestStatusButton = ({ contest, onClick, loading, disabled, isInM
         text: "In Progress",
         variant: "secondary" as const,
         disabled: true,
-        showProgress: true
+        showProgress: true,
+        customClass: ""
       };
     }
 
@@ -59,7 +61,8 @@ export const ContestStatusButton = ({ contest, onClick, loading, disabled, isInM
           text: "Start Contest",
           variant: "default" as const,
           disabled: false,
-          showProgress: false
+          showProgress: false,
+          customClass: ""
         };
       }
       // Default state for joined contests
@@ -67,7 +70,8 @@ export const ContestStatusButton = ({ contest, onClick, loading, disabled, isInM
         text: "Pending",
         variant: "secondary" as const,
         disabled: true,
-        showProgress: false
+        showProgress: false,
+        customClass: ""
       };
     }
 
@@ -77,7 +81,8 @@ export const ContestStatusButton = ({ contest, onClick, loading, disabled, isInM
         text: "Start Contest",
         variant: "default" as const,
         disabled: false,
-        showProgress: false
+        showProgress: false,
+        customClass: ""
       };
     }
 
@@ -86,7 +91,8 @@ export const ContestStatusButton = ({ contest, onClick, loading, disabled, isInM
       text: "Join Contest",
       variant: "default" as const,
       disabled: false,
-      showProgress: false
+      showProgress: false,
+      customClass: ""
     };
   };
 
@@ -96,7 +102,7 @@ export const ContestStatusButton = ({ contest, onClick, loading, disabled, isInM
   return (
     <div className="relative w-full">
       <Button 
-        className={`w-full relative overflow-hidden ${buttonContent.disabled ? 'bg-gray-300 hover:bg-gray-300' : ''}`}
+        className={`w-full relative overflow-hidden ${buttonContent.customClass} ${buttonContent.disabled && !buttonContent.customClass ? 'bg-gray-300 hover:bg-gray-300' : ''}`}
         variant={buttonContent.variant}
         disabled={disabled || buttonContent.disabled}
         onClick={onClick}
