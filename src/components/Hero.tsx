@@ -19,14 +19,14 @@ export const Hero = () => {
     <section className="pt-32 pb-20 px-4">
       <div className="max-w-7xl mx-auto text-center">
         <span className="inline-block animate-fade-in px-4 py-1.5 mb-6 text-sm font-medium bg-primary/10 text-primary rounded-full">
-          Join thousands of players worldwide
+         Join players across Australia and get in on the action!
         </span>
         <h1 className="animate-fade-up text-5xl md:text-7xl font-bold mb-8">
           Play. Compete.
           <span className="text-primary block mt-2">Win Real Money.</span>
         </h1>
         <p className="animate-fade-up animation-delay-100 max-w-2xl mx-auto text-muted text-lg mb-12">
-          Join skill-based contests and compete for real money prizes. Show off your gaming prowess and earn rewards.
+          Join engaging contests and compete for real money prizes.
         </p>
         <div className="animate-fade-up animation-delay-200 flex flex-col sm:flex-row gap-4 justify-center">
           <button onClick={handleGetStarted} className="btn-primary inline-flex items-center">
