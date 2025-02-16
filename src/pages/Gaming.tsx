@@ -66,13 +66,16 @@ const Gaming = () => {
         (payload) => {
           // Update the cached wallet balance
           if (payload.new) {
-            const newProfile = payload.new as { wallet_balance: number };
-            // Update React Query cache using the queryClient instance
-            queryClient.setQueryData(["profile"], newProfile);
+            queryClient.setQueryData(["profile"], {
+              wallet_balance: (payload.new as any).wallet_balance
+            });
           }
         }
       )
       .subscribe();
+
+    // Fetch initial data
+    queryClient.invalidateQueries({ queryKey: ["profile"] });
 
     return () => {
       supabase.removeChannel(channel);
