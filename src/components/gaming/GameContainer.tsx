@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
@@ -7,6 +6,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { CountdownTimer } from "./CountdownTimer";
 import type { Database } from "@/integrations/supabase/types";
+import { ArrangeSortGame } from "./games/ArrangeSortGame";
+import { TriviaGame } from "./games/TriviaGame";
+import { SpotDifferenceGame } from "./games/SpotDifferenceGame";
 
 type PlayerGameProgress = Database["public"]["Tables"]["player_game_progress"]["Insert"];
 
@@ -66,7 +68,6 @@ export const GameContainer = ({ contestId, onGameComplete }: GameContainerProps)
       is_correct: score > 0
     };
 
-    // Record the game progress
     const { error } = await supabase
       .from("player_game_progress")
       .insert(progressData);
@@ -78,10 +79,41 @@ export const GameContainer = ({ contestId, onGameComplete }: GameContainerProps)
 
     onGameComplete(score);
     
-    // Move to next game if available
     if (currentGameIndex < contestGames.length - 1) {
       setCurrentGameIndex(prev => prev + 1);
       setGameStartTime(new Date());
+    }
+  };
+
+  const renderGameContent = (game: any) => {
+    switch (game.game_content.category) {
+      case 'arrange_sort':
+        return (
+          <ArrangeSortGame
+            content={game.game_content.content}
+            onComplete={handleGameEnd}
+          />
+        );
+      case 'trivia':
+        return (
+          <TriviaGame
+            content={game.game_content.content}
+            onComplete={handleGameEnd}
+          />
+        );
+      case 'spot_difference':
+        return (
+          <SpotDifferenceGame
+            content={game.game_content.content}
+            onComplete={handleGameEnd}
+          />
+        );
+      default:
+        return (
+          <div className="text-center py-8">
+            <p>Unsupported game type</p>
+          </div>
+        );
     }
   };
 
@@ -117,9 +149,8 @@ export const GameContainer = ({ contestId, onGameComplete }: GameContainerProps)
         )}
       </div>
 
-      {/* Game content will be implemented in separate components */}
-      <div className="min-h-[300px] flex items-center justify-center">
-        <p>Game Content Coming Soon...</p>
+      <div className="min-h-[300px]">
+        {renderGameContent(currentGame)}
       </div>
     </Card>
   );
