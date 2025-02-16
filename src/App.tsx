@@ -12,6 +12,7 @@ import Sponsorships from "./pages/Sponsorships";
 import Wallet from "./pages/Wallet";
 import Auth from "./pages/Auth";
 import AuthCallback from "./pages/AuthCallback";
+import AccountSettings from "./pages/AccountSettings";
 
 const queryClient = new QueryClient();
 
@@ -29,6 +30,7 @@ const App = () => (
           <Route path="/wallet" element={<Wallet />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
+          <Route path="/account-settings" element={<AccountSettings />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
