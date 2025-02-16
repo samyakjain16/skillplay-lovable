@@ -1,28 +1,25 @@
 
 import { useEffect } from "react";
-import { QueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 
-type Contest = {
+interface Contest {
   id: string;
-  title: string;
-  description: string;
-  series_count: number;
-  max_participants: number;
-  current_participants: number;
   status: string;
-  start_time: string;
-  end_time: string;
-  prize_pool: number;
-  entry_fee: number;
-  prize_distribution_type: string;
-};
+  current_participants: number;
+}
 
-export const useContestRealtime = (queryClient: QueryClient) => {
+interface Participation {
+  contest: Contest;
+}
+
+export const useContestRealtime = () => {
+  const queryClient = useQueryClient();
+
   useEffect(() => {
     const channel = supabase
-      .channel('contests-changes')
+      .channel('my-contests-changes')
       .on(
         'postgres_changes',
         {
@@ -31,25 +28,21 @@ export const useContestRealtime = (queryClient: QueryClient) => {
           table: 'contests'
         },
         (payload: RealtimePostgresChangesPayload<Contest>) => {
-          queryClient.setQueryData(['available-contests'], (oldData: Contest[] | undefined) => {
+          queryClient.setQueryData(['my-contests'], (oldData: Participation[] | undefined) => {
             if (!oldData) return oldData;
             
-            if (payload.eventType === 'DELETE') {
-              return oldData.filter((contest) => contest.id !== payload.old.id);
-            }
+            const newContest = payload.new as Contest;
+            if (!newContest?.id) return oldData;
             
-            const updatedContests = oldData.map((contest) => {
-              if (contest.id === payload.new.id) {
-                return { ...contest, ...payload.new };
+            return oldData.map((participation) => {
+              if (participation.contest.id === newContest.id) {
+                return {
+                  ...participation,
+                  contest: { ...participation.contest, ...newContest }
+                };
               }
-              return contest;
+              return participation;
             });
-            
-            if (payload.eventType === 'INSERT' && !updatedContests.find((c) => c.id === payload.new.id)) {
-              updatedContests.push(payload.new);
-            }
-            
-            return updatedContests;
           });
         }
       )
