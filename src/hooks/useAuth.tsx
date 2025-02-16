@@ -27,20 +27,26 @@ export const useAuth = () => {
 
   const signOut = async () => {
     try {
-      await supabase.auth.signOut();
-      // Always clear local session state regardless of server response
+      // First clear all session data from localStorage
+      window.localStorage.removeItem('supabase.auth.token');
+      window.localStorage.removeItem('supabase.auth.expires_at');
+      window.localStorage.removeItem('supabase.auth.refresh_token');
+      
+      // Clear the session state
       setSession(null);
+
+      // Then attempt to sign out from Supabase
+      await supabase.auth.signOut();
+
       toast({
         title: "Signed out",
         description: "You have been successfully signed out"
       });
     } catch (error) {
       console.error('Error during sign out:', error);
-      // Force clear the session even if there's an error
-      setSession(null);
       toast({
         title: "Signed out",
-        description: "Session has been cleared locally"
+        description: "Session has been cleared"
       });
     }
   };
