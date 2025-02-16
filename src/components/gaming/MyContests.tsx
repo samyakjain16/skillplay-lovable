@@ -8,6 +8,7 @@ import { Trophy, Users, Clock, Award, Hash, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 import { useEffect } from "react";
+import { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 
 // Define the type for contest data
 type Contest = {
@@ -49,7 +50,7 @@ export const MyContests = () => {
           schema: 'public',
           table: 'contests'
         },
-        (payload: { eventType: string; new: Contest | null; old: Contest | null }) => {
+        (payload: RealtimePostgresChangesPayload<Contest>) => {
           queryClient.setQueryData(['my-contests'], (oldData: Participation[] | undefined) => {
             if (!oldData || !payload.new) return oldData;
             
