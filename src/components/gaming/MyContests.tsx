@@ -1,13 +1,42 @@
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
-import { Trophy, Users, Clock, Award, Hash } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/use-toast";
+import { Trophy, Users, Clock, Award, Hash, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 
 export const MyContests = () => {
   const { user } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const startContestMutation = useMutation({
+    mutationFn: async (contestId: string) => {
+      const { error } = await supabase
+        .from("contests")
+        .update({ status: "in_progress" })
+        .eq("id", contestId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Contest Started!",
+        description: "The contest has begun. Good luck!",
+      });
+      queryClient.invalidateQueries({ queryKey: ["my-contests"] });
+    },
+    onError: () => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to start the contest. Please try again.",
+      });
+    },
+  });
 
   const { data: contests, isLoading } = useQuery({
     queryKey: ["my-contests"],
@@ -46,10 +75,60 @@ export const MyContests = () => {
     );
   }
 
+  const getContestStatus = (contest: any) => {
+    const now = new Date();
+    const startTime = new Date(contest.start_time);
+    const isFullyBooked = contest.current_participants >= contest.max_participants;
+    
+    if (contest.status === "in_progress") {
+      return {
+        text: "In Progress",
+        disabled: true,
+        variant: "secondary" as const,
+      };
+    }
+    
+    if (startTime <= now && isFullyBooked) {
+      return {
+        text: "Start Contest",
+        disabled: false,
+        variant: "default" as const,
+        action: () => startContestMutation.mutate(contest.id),
+        loading: startContestMutation.isPending,
+      };
+    }
+    
+    if (startTime <= now) {
+      return {
+        text: `Waiting for Players (${contest.current_participants}/${contest.max_participants})`,
+        disabled: true,
+        variant: "secondary" as const,
+      };
+    }
+    
+    const timeUntilStart = startTime.getTime() - now.getTime();
+    const minutesUntilStart = Math.floor(timeUntilStart / (1000 * 60));
+    
+    if (minutesUntilStart <= 30) {
+      return {
+        text: `Starting in ${minutesUntilStart} minutes`,
+        disabled: true,
+        variant: "secondary" as const,
+      };
+    }
+    
+    return {
+      text: `Starts at ${format(startTime, 'h:mm a')}`,
+      disabled: true,
+      variant: "secondary" as const,
+    };
+  };
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {contests?.map((participation) => {
         const totalPrizePool = participation.contest.current_participants * participation.contest.entry_fee;
+        const status = getContestStatus(participation.contest);
         
         return (
           <Card key={participation.id} className="w-full">
@@ -100,6 +179,24 @@ export const MyContests = () => {
                     </div>
                     <span>{format(new Date(participation.contest.start_time), 'MMM d, h:mm a')}</span>
                   </div>
+                </div>
+
+                <div className="pt-4">
+                  <Button 
+                    className="w-full"
+                    variant={status.variant}
+                    disabled={status.disabled}
+                    onClick={status.action}
+                  >
+                    {status.loading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Starting...
+                      </>
+                    ) : (
+                      status.text
+                    )}
+                  </Button>
                 </div>
               </div>
             </CardContent>
