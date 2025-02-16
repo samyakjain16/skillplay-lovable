@@ -52,13 +52,16 @@ export const MyContests = () => {
         },
         (payload: RealtimePostgresChangesPayload<Contest>) => {
           queryClient.setQueryData(['my-contests'], (oldData: Participation[] | undefined) => {
-            if (!oldData || !payload.new) return oldData;
+            if (!oldData) return oldData;
+            
+            const newContest = payload.new as Contest;
+            if (!newContest?.id) return oldData;
             
             return oldData.map((participation) => {
-              if (participation.contest.id === payload.new?.id) {
+              if (participation.contest.id === newContest.id) {
                 return {
                   ...participation,
-                  contest: { ...participation.contest, ...payload.new }
+                  contest: { ...participation.contest, ...newContest }
                 };
               }
               return participation;
