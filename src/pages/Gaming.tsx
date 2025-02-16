@@ -9,7 +9,7 @@ import { useState } from "react";
 import { Settings, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useEffect } from "react";
@@ -22,6 +22,7 @@ const Gaming = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const { data: profile, isLoading: isLoadingBalance } = useQuery({
     queryKey: ["profile"],
@@ -45,7 +46,7 @@ const Gaming = () => {
     },
     enabled: !!user,
     staleTime: 1000, // Consider data fresh for 1 second
-    cacheTime: 5 * 60 * 1000, // Keep data in cache for 5 minutes
+    gcTime: 5 * 60 * 1000, // Keep data in cache for 5 minutes (formerly cacheTime)
   });
 
   // Set up real-time subscription for wallet balance updates
@@ -66,8 +67,8 @@ const Gaming = () => {
           // Update the cached wallet balance
           if (payload.new) {
             const newProfile = payload.new as { wallet_balance: number };
-            // Update React Query cache
-            window.queryClient.setQueryData(["profile"], newProfile);
+            // Update React Query cache using the queryClient instance
+            queryClient.setQueryData(["profile"], newProfile);
           }
         }
       )
@@ -76,7 +77,7 @@ const Gaming = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [user, queryClient]);
 
   return (
     <AuthGuard>
