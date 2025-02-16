@@ -1,6 +1,5 @@
 
 import { Button } from "@/components/ui/button";
-import { format } from "date-fns";
 import { Loader2 } from "lucide-react";
 
 interface ContestStatusButtonProps {
@@ -32,7 +31,7 @@ export const ContestStatusButton = ({ contest, onClick, loading, disabled }: Con
 
   const getButtonContent = () => {
     // Contest has ended
-    if (now > endTime) {
+    if (now > endTime || contest.status === 'completed') {
       return {
         text: "Completed",
         variant: "secondary" as const,
@@ -51,8 +50,8 @@ export const ContestStatusButton = ({ contest, onClick, loading, disabled }: Con
       };
     }
 
-    // Contest can start (full capacity reached)
-    if (startTime <= now && isFullyBooked) {
+    // Contest is ready to start (all players joined)
+    if (isFullyBooked && startTime <= now) {
       return {
         text: "Start Contest",
         variant: "default" as const,
@@ -61,34 +60,11 @@ export const ContestStatusButton = ({ contest, onClick, loading, disabled }: Con
       };
     }
 
-    // Waiting for more players
-    if (startTime <= now) {
-      return {
-        text: `Waiting for Players (${contest.current_participants}/${contest.max_participants})`,
-        variant: "secondary" as const,
-        disabled: true,
-        showProgress: false
-      };
-    }
-
-    // Starting soon (within 30 minutes)
-    const timeUntilStart = startTime.getTime() - now.getTime();
-    const minutesUntilStart = Math.floor(timeUntilStart / (1000 * 60));
-    
-    if (minutesUntilStart <= 30) {
-      return {
-        text: `Starting in ${minutesUntilStart} minutes`,
-        variant: "secondary" as const,
-        disabled: true,
-        showProgress: false
-      };
-    }
-
-    // Default state (shows start time)
+    // Default state - Join Contest
     return {
-      text: `Starts at ${format(startTime, 'h:mm a')}`,
-      variant: "secondary" as const,
-      disabled: true,
+      text: "Join Contest",
+      variant: "default" as const,
+      disabled: false,
       showProgress: false
     };
   };
@@ -107,7 +83,7 @@ export const ContestStatusButton = ({ contest, onClick, loading, disabled }: Con
         {loading ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Starting...
+            {isFullyBooked ? "Starting..." : "Joining..."}
           </>
         ) : (
           buttonContent.text
