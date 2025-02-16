@@ -9,6 +9,9 @@ export const Navigation = () => {
   const [isOpen, setIsOpen] = useState(false);
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const isHomePage = location.pathname === '/';
 
   const handleAuthAction = () => {
     if (user) {
@@ -16,6 +19,20 @@ export const Navigation = () => {
     } else {
       navigate('/auth');
     }
+  };
+
+  const renderAuthButton = () => {
+    // On homepage, always show "Start Playing"
+    if (isHomePage) {
+      return <Button onClick={handleAuthAction}>Start Playing</Button>;
+    }
+    
+    // On other pages, show Sign Out if authenticated
+    return user ? (
+      <Button variant="outline" onClick={() => signOut()}>Sign Out</Button>
+    ) : (
+      <Button onClick={handleAuthAction}>Start Playing</Button>
+    );
   };
 
   return (
@@ -27,11 +44,7 @@ export const Navigation = () => {
           </div>
           
           <div className="hidden md:flex items-center space-x-8">
-            {user ? (
-              <Button variant="outline" onClick={() => signOut()}>Sign Out</Button>
-            ) : (
-              <Button onClick={handleAuthAction}>Start Playing</Button>
-            )}
+            {renderAuthButton()}
           </div>
           
           <div className="md:hidden flex items-center">
@@ -48,11 +61,7 @@ export const Navigation = () => {
       {isOpen && (
         <div className="md:hidden">
           <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-            {user ? (
-              <Button className="w-full mt-2" variant="outline" onClick={() => signOut()}>Sign Out</Button>
-            ) : (
-              <Button className="w-full" onClick={handleAuthAction}>Start Playing</Button>
-            )}
+            {renderAuthButton()}
           </div>
         </div>
       )}
