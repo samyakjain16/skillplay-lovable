@@ -1,3 +1,4 @@
+
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
@@ -7,6 +8,31 @@ import { Trophy, Users, Clock, Award, Hash, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 import { useEffect } from "react";
+
+// Define the type for contest data
+type Contest = {
+  id: string;
+  title: string;
+  description: string;
+  series_count: number;
+  max_participants: number;
+  current_participants: number;
+  status: string;
+  start_time: string;
+  end_time: string;
+  prize_pool: number;
+  entry_fee: number;
+  prize_distribution_type: string;
+};
+
+// Define the type for participation data
+type Participation = {
+  id: string;
+  user_id: string;
+  contest_id: string;
+  joined_at: string;
+  contest: Contest;
+};
 
 export const MyContests = () => {
   const { user } = useAuth();
@@ -23,11 +49,11 @@ export const MyContests = () => {
           schema: 'public',
           table: 'contests'
         },
-        (payload) => {
-          queryClient.setQueryData(['my-contests'], (oldData: any) => {
-            if (!oldData) return oldData;
+        (payload: { eventType: string; new: Contest | null; old: Contest | null }) => {
+          queryClient.setQueryData(['my-contests'], (oldData: Participation[] | undefined) => {
+            if (!oldData || !payload.new) return oldData;
             
-            return oldData.map((participation: any) => {
+            return oldData.map((participation) => {
               if (participation.contest.id === payload.new?.id) {
                 return {
                   ...participation,
@@ -88,7 +114,7 @@ export const MyContests = () => {
         .order("joined_at", { ascending: false });
 
       if (error) throw error;
-      return data;
+      return data as Participation[];
     },
     enabled: !!user?.id,
   });
