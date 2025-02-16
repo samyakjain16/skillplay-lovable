@@ -1,7 +1,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 
 interface ContestStatusButtonProps {
   contest: {
@@ -20,45 +20,54 @@ interface ContestStatusButtonProps {
 export const ContestStatusButton = ({ contest, onClick, loading, disabled, isInMyContests }: ContestStatusButtonProps) => {
   const [progress, setProgress] = useState(0);
   
+  const calculateProgress = useCallback(() => {
+    const now = new Date();
+    const startTime = new Date(contest.start_time);
+    const endTime = new Date(contest.end_time);
+    const totalDuration = endTime.getTime() - startTime.getTime();
+    const elapsed = now.getTime() - startTime.getTime();
+    return Math.min(Math.max((elapsed / totalDuration) * 100, 0), 100);
+  }, [contest.start_time, contest.end_time]);
+
+  // Update progress immediately when status changes
   useEffect(() => {
     if (contest.status !== 'in_progress') {
       setProgress(0);
       return;
     }
+    setProgress(calculateProgress());
+  }, [contest.status, calculateProgress]);
 
-    const calculateProgress = () => {
-      const now = new Date();
-      const startTime = new Date(contest.start_time);
-      const endTime = new Date(contest.end_time);
-      const totalDuration = endTime.getTime() - startTime.getTime();
-      const elapsed = now.getTime() - startTime.getTime();
-      return Math.min(Math.max((elapsed / totalDuration) * 100, 0), 100);
-    };
+  // Set up interval for real-time updates
+  useEffect(() => {
+    if (contest.status !== 'in_progress') {
+      return;
+    }
 
-    // Set initial progress
+    // Update immediately
     setProgress(calculateProgress());
 
-    // Update progress every second
+    // Then update every second
     const interval = setInterval(() => {
       const newProgress = calculateProgress();
       setProgress(newProgress);
       
-      // Clear interval if contest has ended
       if (newProgress >= 100) {
         clearInterval(interval);
       }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [contest.status, contest.start_time, contest.end_time]);
+  }, [contest.status, calculateProgress]);
 
   const now = new Date();
-  const startTime = new Date(contest.start_time);
   const endTime = new Date(contest.end_time);
+  const isContestEnded = now > endTime || contest.status === 'completed';
+  const isContestFull = contest.current_participants >= contest.max_participants;
 
   const getButtonContent = () => {
     // Check for completed contests first
-    if (contest.status === 'completed' || now > endTime) {
+    if (isContestEnded) {
       return {
         text: "Completed",
         variant: "secondary" as const,
@@ -68,21 +77,18 @@ export const ContestStatusButton = ({ contest, onClick, loading, disabled, isInM
       };
     }
 
-    // Contest is in progress - allow joining/starting for valid timeframe
-    if (contest.status === 'in_progress' && now < endTime) {
-      return {
-        text: isInMyContests ? "Start Contest" : "Join Contest",
-        variant: "default" as const,
-        disabled: false,
-        showProgress: true,
-        customClass: ""
-      };
-    }
-
     // For My Contests section
     if (isInMyContests) {
-      // Check if contest should be started
-      if (startTime <= now && contest.status === 'upcoming') {
+      if (contest.status === 'in_progress') {
+        return {
+          text: "Start Contest",
+          variant: "default" as const,
+          disabled: false,
+          showProgress: true,
+          customClass: ""
+        };
+      }
+      if (contest.status === 'upcoming') {
         return {
           text: "Start Contest",
           variant: "default" as const,
@@ -91,7 +97,6 @@ export const ContestStatusButton = ({ contest, onClick, loading, disabled, isInM
           customClass: ""
         };
       }
-      // Default state for joined contests
       return {
         text: "Pending",
         variant: "secondary" as const,
@@ -101,12 +106,22 @@ export const ContestStatusButton = ({ contest, onClick, loading, disabled, isInM
       };
     }
 
-    // Default state for available contests
+    // Available Contests section
+    if (isContestFull) {
+      return {
+        text: "Contest Full",
+        variant: "secondary" as const,
+        disabled: true,
+        showProgress: contest.status === 'in_progress',
+        customClass: ""
+      };
+    }
+
     return {
       text: "Join Contest",
       variant: "default" as const,
       disabled: false,
-      showProgress: false,
+      showProgress: contest.status === 'in_progress',
       customClass: ""
     };
   };
@@ -140,7 +155,7 @@ export const ContestStatusButton = ({ contest, onClick, loading, disabled, isInM
               className="h-full bg-primary"
               style={{ 
                 width: `${progress}%`,
-                transition: 'width 1s linear'
+                transition: 'width 0.5s linear'
               }}
             />
           </div>
