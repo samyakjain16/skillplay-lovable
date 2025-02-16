@@ -13,21 +13,26 @@ import { SpotDifferenceGame } from "./games/SpotDifferenceGame";
 
 type PlayerGameProgress = Database["public"]["Tables"]["player_game_progress"]["Insert"];
 
-interface GameContent {
-  id: string;
-  category: 'arrange_sort' | 'trivia' | 'spot_difference';
-  content: any;
-}
-
 interface GameContainerProps {
   contestId: string;
   onGameComplete: (score: number, isFinalGame: boolean) => void;
+  initialProgress?: {
+    current_game_index: number;
+    current_game_start_time: string | null;
+    current_game_score: number;
+  } | null;
 }
 
-export const GameContainer = ({ contestId, onGameComplete }: GameContainerProps) => {
+export const GameContainer = ({ 
+  contestId, 
+  onGameComplete,
+  initialProgress 
+}: GameContainerProps) => {
   const { user } = useAuth();
-  const [currentGameIndex, setCurrentGameIndex] = useState(0);
-  const [gameStartTime, setGameStartTime] = useState<Date | null>(null);
+  const [currentGameIndex, setCurrentGameIndex] = useState(initialProgress?.current_game_index || 0);
+  const [gameStartTime, setGameStartTime] = useState<Date | null>(
+    initialProgress?.current_game_start_time ? new Date(initialProgress.current_game_start_time) : null
+  );
 
   const { data: contestGames, isLoading } = useQuery({
     queryKey: ["contest-games", contestId],
@@ -47,10 +52,26 @@ export const GameContainer = ({ contestId, onGameComplete }: GameContainerProps)
   });
 
   useEffect(() => {
-    if (contestGames && contestGames.length > 0) {
-      setGameStartTime(new Date());
+    if (contestGames && contestGames.length > 0 && !gameStartTime) {
+      const newStartTime = new Date();
+      setGameStartTime(newStartTime);
+      
+      // Update the start time in the database
+      if (user) {
+        supabase
+          .from('user_contests')
+          .update({ 
+            current_game_start_time: newStartTime.toISOString(),
+            current_game_index: currentGameIndex
+          })
+          .eq('contest_id', contestId)
+          .eq('user_id', user.id)
+          .then(({ error }) => {
+            if (error) console.error('Error updating game start time:', error);
+          });
+      }
     }
-  }, [contestGames]);
+  }, [contestGames, currentGameIndex, user, contestId, gameStartTime]);
 
   const handleGameEnd = async (score: number) => {
     if (!user || !contestGames) return;
@@ -70,12 +91,29 @@ export const GameContainer = ({ contestId, onGameComplete }: GameContainerProps)
       is_correct: score > 0
     };
 
-    const { error } = await supabase
+    // Record game progress
+    const { error: progressError } = await supabase
       .from("player_game_progress")
       .insert(progressData);
 
-    if (error) {
-      console.error("Error recording game progress:", error);
+    if (progressError) {
+      console.error("Error recording game progress:", progressError);
+      return;
+    }
+
+    // Update user_contests with current game progress
+    const { error: updateError } = await supabase
+      .from('user_contests')
+      .update({
+        current_game_index: isFinalGame ? currentGameIndex : currentGameIndex + 1,
+        current_game_score: score,
+        current_game_start_time: null // Reset for next game
+      })
+      .eq('contest_id', contestId)
+      .eq('user_id', user.id);
+
+    if (updateError) {
+      console.error("Error updating contest progress:", updateError);
       return;
     }
 

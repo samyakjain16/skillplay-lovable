@@ -4,11 +4,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useNavigate, useParams } from "react-router-dom";
 import { Timer, Trophy, MessageSquare } from "lucide-react";
 import { GameContainer } from "@/components/gaming/GameContainer";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useQuery } from "@tanstack/react-query";
 
 const Contest = () => {
   const { id } = useParams();
@@ -18,16 +19,47 @@ const Contest = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
 
+  // Fetch contest progress
+  const { data: contestProgress } = useQuery({
+    queryKey: ["contest-progress", id],
+    queryFn: async () => {
+      if (!user || !id) return null;
+      const { data, error } = await supabase
+        .from('user_contests')
+        .select('*')
+        .eq('contest_id', id)
+        .eq('user_id', user.id)
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user && !!id
+  });
+
+  // Set initial state from contest progress
+  useEffect(() => {
+    if (contestProgress) {
+      setTotalScore(contestProgress.score || 0);
+      setIsCompleted(contestProgress.status === 'completed');
+    }
+  }, [contestProgress]);
+
   const handleGameComplete = async (score: number, isFinalGame: boolean) => {
-    setTotalScore(prev => prev + score);
+    if (!user || !id) return;
     
-    if (isFinalGame && user) {
+    const newTotalScore = totalScore + score;
+    setTotalScore(newTotalScore);
+    
+    if (isFinalGame) {
       // Update user_contests status to completed
       const { error } = await supabase
         .from('user_contests')
         .update({ 
           status: 'completed',
-          score: totalScore + score // Include the final game's score
+          score: newTotalScore,
+          current_game_index: 0, // Reset for next time
+          current_game_score: 0
         })
         .eq('contest_id', id)
         .eq('user_id', user.id);
@@ -45,7 +77,7 @@ const Contest = () => {
       setIsCompleted(true);
       toast({
         title: "Contest Completed!",
-        description: `Your final score is ${totalScore + score}`,
+        description: `Your final score is ${newTotalScore}`,
       });
     }
   };
@@ -87,6 +119,7 @@ const Contest = () => {
                 <GameContainer 
                   contestId={id}
                   onGameComplete={handleGameComplete}
+                  initialProgress={contestProgress}
                 />
               )}
             </div>
