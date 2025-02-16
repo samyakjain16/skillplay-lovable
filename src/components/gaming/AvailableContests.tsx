@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
-import { Trophy, Users, Clock, Award, Hash } from "lucide-react";
+import { Trophy, Users, Clock, Award, Hash, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 
@@ -12,6 +12,22 @@ export const AvailableContests = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Query to get user's joined contests
+  const { data: joinedContests } = useQuery({
+    queryKey: ["joined-contests"],
+    queryFn: async () => {
+      if (!user) return [];
+      const { data, error } = await supabase
+        .from("user_contests")
+        .select("contest_id")
+        .eq("user_id", user.id);
+
+      if (error) throw error;
+      return data.map(uc => uc.contest_id);
+    },
+    enabled: !!user
+  });
 
   const { data: contests, isLoading } = useQuery({
     queryKey: ["available-contests"],
@@ -66,14 +82,14 @@ export const AvailableContests = () => {
       if (participationError) throw participationError;
 
       // Deduct entry fee
-      const { error: walletError } = await supabase.from("wallet_transactions").insert([
-        {
+      const { error: walletError } = await supabase
+        .from("wallet_transactions")
+        .insert([{
           user_id: user?.id,
           amount: -contest.entry_fee,
           type: "contest_entry",
           reference_id: contestId,
-        },
-      ]);
+        }]);
 
       if (walletError) throw walletError;
 
@@ -92,6 +108,7 @@ export const AvailableContests = () => {
       });
       queryClient.invalidateQueries({ queryKey: ["available-contests"] });
       queryClient.invalidateQueries({ queryKey: ["profile"] });
+      queryClient.invalidateQueries({ queryKey: ["joined-contests"] });
     },
     onError: (error: Error) => {
       toast({
@@ -108,10 +125,16 @@ export const AvailableContests = () => {
     return <div>Loading contests...</div>;
   }
 
+  // Filter out contests that the user has already joined
+  const availableContests = contests?.filter(contest => 
+    !joinedContests?.includes(contest.id)
+  );
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {contests?.map((contest) => {
+      {availableContests?.map((contest) => {
         const totalPrizePool = contest.current_participants * contest.entry_fee;
+        const isJoining = joinContestMutation.isPending;
         
         return (
           <Card key={contest.id} className="w-full">
@@ -168,9 +191,16 @@ export const AvailableContests = () => {
                   <Button 
                     className="w-full"
                     onClick={() => joinContestMutation.mutate(contest.id)}
-                    disabled={joinContestMutation.isPending}
+                    disabled={isJoining}
                   >
-                    Join for ${contest.entry_fee}
+                    {isJoining ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Joining...
+                      </>
+                    ) : (
+                      `Join for $${contest.entry_fee}`
+                    )}
                   </Button>
                 </div>
               </div>
