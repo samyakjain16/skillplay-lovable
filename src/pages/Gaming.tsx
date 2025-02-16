@@ -6,12 +6,14 @@ import { MyContests } from "@/components/gaming/MyContests";
 import { BottomNav } from "@/components/gaming/BottomNav";
 import { AuthGuard } from "@/components/AuthGuard";
 import { useState } from "react";
-import { Settings } from "lucide-react";
+import { Settings, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useEffect } from "react";
+import { useToast } from "@/components/ui/use-toast";
 
 type TabType = "available" | "my-contests" | "create";
 
@@ -19,8 +21,9 @@ const Gaming = () => {
   const [activeTab, setActiveTab] = useState<TabType>("available");
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { toast } = useToast();
 
-  const { data: profile } = useQuery({
+  const { data: profile, isLoading: isLoadingBalance } = useQuery({
     queryKey: ["profile"],
     queryFn: async () => {
       if (!user) return null;
@@ -30,11 +33,50 @@ const Gaming = () => {
         .eq("id", user.id)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        toast({
+          variant: "destructive",
+          title: "Error fetching balance",
+          description: "Please try refreshing the page",
+        });
+        throw error;
+      }
       return data;
     },
-    enabled: !!user
+    enabled: !!user,
+    staleTime: 1000, // Consider data fresh for 1 second
+    cacheTime: 5 * 60 * 1000, // Keep data in cache for 5 minutes
   });
+
+  // Set up real-time subscription for wallet balance updates
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel('wallet-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${user.id}`
+        },
+        (payload) => {
+          // Update the cached wallet balance
+          if (payload.new) {
+            const newProfile = payload.new as { wallet_balance: number };
+            // Update React Query cache
+            window.queryClient.setQueryData(["profile"], newProfile);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
 
   return (
     <AuthGuard>
@@ -44,7 +86,11 @@ const Gaming = () => {
           <div className="container mx-auto px-4 py-2 flex justify-between items-center">
             <div className="flex items-center gap-2">
               <span className="text-sm text-gray-600">Balance:</span>
-              <span className="font-semibold">${profile?.wallet_balance || 0}</span>
+              {isLoadingBalance ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <span className="font-semibold">${profile?.wallet_balance?.toFixed(2) || '0.00'}</span>
+              )}
             </div>
             <Button
               variant="outline"
