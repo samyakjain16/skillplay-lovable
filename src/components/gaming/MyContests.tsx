@@ -41,13 +41,36 @@ export const MyContests = () => {
 
   const startContestMutation = useMutation({
     mutationFn: async (contestId: string) => {
-      const { error } = await supabase
+      console.log('Starting contest mutation for:', contestId);
+      
+      // First update the contest status
+      const { error: updateError } = await supabase
         .from("contests")
         .update({ status: "in_progress" })
         .eq("id", contestId);
 
-      if (error) throw error;
-      return contestId; // Return contestId for use in onSuccess
+      if (updateError) {
+        console.error('Error updating contest status:', updateError);
+        throw updateError;
+      }
+
+      // Initialize or update user_contests entry
+      const { error: userContestError } = await supabase
+        .from("user_contests")
+        .upsert({
+          contest_id: contestId,
+          user_id: user?.id,
+          status: 'active',
+          current_game_index: 0,
+          current_game_score: 0
+        });
+
+      if (userContestError) {
+        console.error('Error updating user contest:', userContestError);
+        throw userContestError;
+      }
+
+      return contestId;
     },
     onSuccess: (contestId) => {
       toast({
@@ -58,7 +81,8 @@ export const MyContests = () => {
       // Navigate to the contest page
       navigate(`/contest/${contestId}`);
     },
-    onError: () => {
+    onError: (error) => {
+      console.error('Start contest error:', error);
       toast({
         variant: "destructive",
         title: "Error",
@@ -134,7 +158,10 @@ export const MyContests = () => {
         <ContestCard
           key={participation.id}
           contest={participation.contest}
-          onStart={startContestMutation.mutate}
+          onStart={(contestId) => {
+            console.log('Contest start requested:', contestId);
+            startContestMutation.mutate(contestId);
+          }}
           isStarting={startContestMutation.isPending}
           isInMyContests={true}
         />

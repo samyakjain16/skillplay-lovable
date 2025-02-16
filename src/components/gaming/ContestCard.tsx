@@ -2,6 +2,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { ContestDetails } from "./ContestCard/ContestDetails";
 import { ContestStatusButton } from "./ContestStatusButton";
+import { useToast } from "@/components/ui/use-toast";
 
 interface Contest {
   id: string;
@@ -29,6 +30,34 @@ interface ContestCardProps {
 
 export const ContestCard = ({ contest, onStart, isStarting, onJoin, isJoining, isInMyContests }: ContestCardProps) => {
   const totalPrizePool = contest.current_participants * contest.entry_fee;
+  const { toast } = useToast();
+  
+  const handleContestAction = () => {
+    const now = new Date();
+    const startTime = new Date(contest.start_time);
+    const endTime = new Date(contest.end_time);
+    const isFullyBooked = contest.current_participants >= contest.max_participants;
+    
+    // Don't allow any actions if the contest has ended
+    if (now > endTime) {
+      toast({
+        variant: "destructive",
+        title: "Contest Ended",
+        description: "This contest has already ended."
+      });
+      return;
+    }
+
+    // Check if the contest can be started
+    if (isFullyBooked && startTime <= now && contest.status === 'upcoming') {
+      if (onStart) {
+        console.log('Starting contest:', contest.id);
+        onStart(contest.id);
+      }
+    } else if (!isFullyBooked && onJoin) {
+      onJoin(contest.id);
+    }
+  };
   
   return (
     <Card className="w-full">
@@ -50,23 +79,7 @@ export const ContestCard = ({ contest, onStart, isStarting, onJoin, isJoining, i
           <div className="pt-4">
             <ContestStatusButton 
               contest={contest}
-              onClick={() => {
-                const now = new Date();
-                const startTime = new Date(contest.start_time);
-                const endTime = new Date(contest.end_time);
-                const isFullyBooked = contest.current_participants >= contest.max_participants;
-                
-                // Don't allow any actions if the contest has ended
-                if (now > endTime) {
-                  return;
-                }
-                
-                if (isFullyBooked && startTime <= now && contest.status === 'upcoming') {
-                  onStart?.(contest.id);
-                } else if (!isFullyBooked && onJoin) {
-                  onJoin(contest.id);
-                }
-              }}
+              onClick={handleContestAction}
               loading={isStarting || isJoining}
               isInMyContests={isInMyContests}
             />
