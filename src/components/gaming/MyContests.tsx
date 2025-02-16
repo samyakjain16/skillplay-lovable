@@ -69,6 +69,20 @@ export const MyContests = () => {
         return [];
       }
 
+      const now = new Date();
+
+      // First update any contests that should be marked as completed
+      const { error: updateError } = await supabase
+        .from("contests")
+        .update({ status: "completed" })
+        .lt("end_time", now.toISOString())
+        .neq("status", "completed");
+
+      if (updateError) {
+        console.error("Error updating contest statuses:", updateError);
+      }
+
+      // Then fetch the contests
       const { data, error } = await supabase
         .from("user_contests")
         .select(`
