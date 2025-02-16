@@ -8,6 +8,8 @@ interface Contest {
   id: string;
   status: string;
   current_participants: number;
+  start_time: string;
+  end_time: string;
 }
 
 interface Participation {
@@ -19,7 +21,7 @@ export const useContestRealtime = () => {
 
   useEffect(() => {
     const channel = supabase
-      .channel('my-contests-changes')
+      .channel('contest-changes')
       .on(
         'postgres_changes',
         {
@@ -28,20 +30,23 @@ export const useContestRealtime = () => {
           table: 'contests'
         },
         (payload: RealtimePostgresChangesPayload<Contest>) => {
-          queryClient.setQueryData(['my-contests'], (oldData: Participation[] | undefined) => {
-            if (!oldData) return oldData;
-            
-            const newContest = payload.new as Contest;
-            if (!newContest?.id) return oldData;
-            
-            return oldData.map((participation) => {
-              if (participation.contest.id === newContest.id) {
-                return {
-                  ...participation,
-                  contest: { ...participation.contest, ...newContest }
-                };
-              }
-              return participation;
+          // Update both my-contests and available-contests queries
+          ['my-contests', 'available-contests'].forEach(queryKey => {
+            queryClient.setQueryData([queryKey], (oldData: Participation[] | undefined) => {
+              if (!oldData) return oldData;
+              
+              const newContest = payload.new as Contest;
+              if (!newContest?.id) return oldData;
+              
+              return oldData.map((participation) => {
+                if (participation.contest.id === newContest.id) {
+                  return {
+                    ...participation,
+                    contest: { ...participation.contest, ...newContest }
+                  };
+                }
+                return participation;
+              });
             });
           });
         }

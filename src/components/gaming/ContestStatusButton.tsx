@@ -55,7 +55,6 @@ export const ContestStatusButton = ({ contest, onClick, loading, disabled, isInM
   const now = new Date();
   const startTime = new Date(contest.start_time);
   const endTime = new Date(contest.end_time);
-  const isFullyBooked = contest.current_participants >= contest.max_participants;
 
   const getButtonContent = () => {
     // Check for completed contests first
@@ -69,21 +68,12 @@ export const ContestStatusButton = ({ contest, onClick, loading, disabled, isInM
       };
     }
 
-    // Contest is in progress
-    if (contest.status === 'in_progress') {
-      if (startTime <= now && now < endTime) {
-        return {
-          text: "Start Contest",
-          variant: "default" as const,
-          disabled: false,
-          showProgress: true,
-          customClass: ""
-        };
-      }
+    // Contest is in progress - allow joining/starting for valid timeframe
+    if (contest.status === 'in_progress' && now < endTime) {
       return {
-        text: "In Progress",
-        variant: "secondary" as const,
-        disabled: true,
+        text: isInMyContests ? "Start Contest" : "Join Contest",
+        variant: "default" as const,
+        disabled: false,
         showProgress: true,
         customClass: ""
       };
@@ -106,17 +96,6 @@ export const ContestStatusButton = ({ contest, onClick, loading, disabled, isInM
         text: "Pending",
         variant: "secondary" as const,
         disabled: true,
-        showProgress: false,
-        customClass: ""
-      };
-    }
-
-    // For Available Contests section
-    if (isFullyBooked && startTime <= now && contest.status === 'upcoming') {
-      return {
-        text: "Start Contest",
-        variant: "default" as const,
-        disabled: false,
         showProgress: false,
         customClass: ""
       };
@@ -145,7 +124,7 @@ export const ContestStatusButton = ({ contest, onClick, loading, disabled, isInM
         {loading ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            {isFullyBooked ? "Starting..." : "Joining..."}
+            {isInMyContests ? "Starting..." : "Joining..."}
           </>
         ) : (
           buttonContent.text
@@ -158,7 +137,7 @@ export const ContestStatusButton = ({ contest, onClick, loading, disabled, isInM
             style={{ width: '100%' }}
           >
             <div 
-              className="h-full bg-primary transition-all duration-1000"
+              className="h-full bg-primary"
               style={{ 
                 width: `${progress}%`,
                 transition: 'width 1s linear'
