@@ -41,7 +41,7 @@ export const ContestStatusButton = ({ contest, onClick, loading, disabled }: Con
     }
 
     // Contest is in progress
-    if (contest.status === "in_progress") {
+    if (contest.status === 'in_progress') {
       return {
         text: "In Progress",
         variant: "secondary" as const,
@@ -51,7 +51,7 @@ export const ContestStatusButton = ({ contest, onClick, loading, disabled }: Con
     }
 
     // Contest is ready to start (all players joined)
-    if (isFullyBooked && startTime <= now) {
+    if (isFullyBooked && startTime <= now && contest.status === 'upcoming') {
       return {
         text: "Start Contest",
         variant: "default" as const,

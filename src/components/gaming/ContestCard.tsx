@@ -54,7 +54,7 @@ export const ContestCard = ({ contest, onStart, isStarting, onJoin, isJoining }:
                 const startTime = new Date(contest.start_time);
                 const isFullyBooked = contest.current_participants >= contest.max_participants;
                 
-                if (startTime <= now && isFullyBooked && contest.status === 'upcoming') {
+                if (isFullyBooked && startTime <= now && contest.status === 'upcoming') {
                   onStart?.(contest.id);
                 } else if (!isFullyBooked && onJoin) {
                   onJoin(contest.id);
