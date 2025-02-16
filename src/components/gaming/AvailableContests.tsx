@@ -63,9 +63,10 @@ export const AvailableContests = () => {
     return <div>Loading contests...</div>;
   }
 
-  // Filter out contests that the user has already joined
+  // Filter out contests that are either full or already joined by the user
   const availableContests = contests?.filter(contest => 
-    !joinedContests?.includes(contest.id)
+    !joinedContests?.includes(contest.id) && 
+    contest.current_participants < contest.max_participants
   );
 
   return (

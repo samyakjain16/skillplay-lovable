@@ -1,6 +1,6 @@
 
 import { Trophy, Users, Clock, Award, Hash } from "lucide-react";
-import { format } from "date-fns";
+import { CountdownTimer } from "../CountdownTimer";
 
 interface ContestDetailsProps {
   currentParticipants: number;
@@ -56,9 +56,9 @@ export const ContestDetails = ({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Clock className="h-4 w-4 text-primary" />
-          <span>Starts</span>
+          <span>Starts in</span>
         </div>
-        <span>{format(new Date(startTime), 'MMM d, h:mm a')}</span>
+        <CountdownTimer targetDate={new Date(startTime)} />
       </div>
     </div>
   );
