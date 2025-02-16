@@ -199,7 +199,6 @@ export const MyContests = () => {
               <div className="space-y-4">
                 <div>
                   <h3 className="text-lg font-semibold">{participation.contest.title}</h3>
-                  <p className="text-sm text-muted-foreground">{participation.contest.description}</p>
                 </div>
 
                 <div className="space-y-2 text-sm">
