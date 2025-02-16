@@ -105,46 +105,74 @@ export const AvailableContests = () => {
 
   const joinContestMutation = useMutation({
     mutationFn: async (contestId: string) => {
-      // Start a transaction
+      if (!user?.id) throw new Error("User not authenticated");
+      
+      // Start transaction
       const { data: contest, error: contestError } = await supabase
         .from("contests")
-        .select("entry_fee")
+        .select("entry_fee, current_participants, max_participants")
         .eq("id", contestId)
         .single();
 
       if (contestError) throw contestError;
+      
+      // Check if contest is full
+      if (contest.current_participants >= contest.max_participants) {
+        throw new Error("Contest is full");
+      }
 
       // Check wallet balance
-      if (profile && profile.wallet_balance < contest.entry_fee) {
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("wallet_balance")
+        .eq("id", user.id)
+        .single();
+
+      if (profileError) throw profileError;
+      if (profile.wallet_balance < contest.entry_fee) {
         throw new Error("Insufficient balance");
       }
 
       // Create participation record
       const { error: participationError } = await supabase
         .from("user_contests")
-        .insert([{ user_id: user?.id, contest_id: contestId }]);
+        .insert([{ user_id: user.id, contest_id: contestId }]);
 
-      if (participationError) throw participationError;
+      if (participationError) {
+        // Check if user already joined
+        if (participationError.code === '23505') { // Unique violation
+          throw new Error("You have already joined this contest");
+        }
+        throw participationError;
+      }
 
-      // Deduct entry fee
-      const { error: walletError } = await supabase
+      // Update contest participants count
+      const { error: updateError } = await supabase
+        .from("contests")
+        .update({ current_participants: contest.current_participants + 1 })
+        .eq("id", contestId);
+
+      if (updateError) throw updateError;
+
+      // Create wallet transaction
+      const { error: transactionError } = await supabase
         .from("wallet_transactions")
         .insert([{
-          user_id: user?.id,
+          user_id: user.id,
           amount: -contest.entry_fee,
           type: "contest_entry",
           reference_id: contestId,
         }]);
 
-      if (walletError) throw walletError;
+      if (transactionError) throw transactionError;
 
       // Update user's wallet balance
-      const { error: updateError } = await supabase
+      const { error: walletError } = await supabase
         .from("profiles")
-        .update({ wallet_balance: profile!.wallet_balance - contest.entry_fee })
-        .eq("id", user?.id);
+        .update({ wallet_balance: profile.wallet_balance - contest.entry_fee })
+        .eq("id", user.id);
 
-      if (updateError) throw updateError;
+      if (walletError) throw walletError;
     },
     onSuccess: () => {
       toast({
@@ -159,10 +187,11 @@ export const AvailableContests = () => {
       toast({
         variant: "destructive",
         title: "Error",
-        description: error.message === "Insufficient balance" 
-          ? "Insufficient balance. Please add funds to your wallet."
-          : "Failed to join contest. Please try again.",
+        description: error.message,
       });
+      // Invalidate queries to ensure UI is in sync
+      queryClient.invalidateQueries({ queryKey: ["available-contests"] });
+      queryClient.invalidateQueries({ queryKey: ["joined-contests"] });
     },
   });
 
