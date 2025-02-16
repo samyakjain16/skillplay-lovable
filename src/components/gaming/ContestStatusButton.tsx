@@ -1,6 +1,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
 
 interface ContestStatusButtonProps {
   contest: {
@@ -17,18 +18,44 @@ interface ContestStatusButtonProps {
 }
 
 export const ContestStatusButton = ({ contest, onClick, loading, disabled, isInMyContests }: ContestStatusButtonProps) => {
+  const [progress, setProgress] = useState(0);
+  
+  useEffect(() => {
+    if (contest.status !== 'in_progress') {
+      setProgress(0);
+      return;
+    }
+
+    const calculateProgress = () => {
+      const now = new Date();
+      const startTime = new Date(contest.start_time);
+      const endTime = new Date(contest.end_time);
+      const totalDuration = endTime.getTime() - startTime.getTime();
+      const elapsed = now.getTime() - startTime.getTime();
+      return Math.min(Math.max((elapsed / totalDuration) * 100, 0), 100);
+    };
+
+    // Set initial progress
+    setProgress(calculateProgress());
+
+    // Update progress every second
+    const interval = setInterval(() => {
+      const newProgress = calculateProgress();
+      setProgress(newProgress);
+      
+      // Clear interval if contest has ended
+      if (newProgress >= 100) {
+        clearInterval(interval);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [contest.status, contest.start_time, contest.end_time]);
+
   const now = new Date();
   const startTime = new Date(contest.start_time);
   const endTime = new Date(contest.end_time);
   const isFullyBooked = contest.current_participants >= contest.max_participants;
-  
-  // Calculate progress percentage for active contests
-  const getProgressPercentage = () => {
-    if (contest.status !== 'in_progress') return 0;
-    const totalDuration = endTime.getTime() - startTime.getTime();
-    const elapsed = now.getTime() - startTime.getTime();
-    return Math.min(Math.max((elapsed / totalDuration) * 100, 0), 100);
-  };
 
   const getButtonContent = () => {
     // Check for completed contests first
@@ -44,8 +71,7 @@ export const ContestStatusButton = ({ contest, onClick, loading, disabled, isInM
 
     // Contest is in progress
     if (contest.status === 'in_progress') {
-      // For my contests section, allow starting even when in progress
-      if (isInMyContests && startTime <= now && now < endTime) {
+      if (startTime <= now && now < endTime) {
         return {
           text: "Start Contest",
           variant: "default" as const,
@@ -107,7 +133,6 @@ export const ContestStatusButton = ({ contest, onClick, loading, disabled, isInM
   };
 
   const buttonContent = getButtonContent();
-  const progressPercentage = getProgressPercentage();
 
   return (
     <div className="relative w-full">
@@ -135,7 +160,7 @@ export const ContestStatusButton = ({ contest, onClick, loading, disabled, isInM
             <div 
               className="h-full bg-primary transition-all duration-1000"
               style={{ 
-                width: `${progressPercentage}%`,
+                width: `${progress}%`,
                 transition: 'width 1s linear'
               }}
             />
