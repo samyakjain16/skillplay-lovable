@@ -17,6 +17,10 @@ import { useToast } from "@/components/ui/use-toast";
 
 type TabType = "available" | "my-contests" | "create";
 
+interface Profile {
+  wallet_balance: number;
+}
+
 const Gaming = () => {
   const [activeTab, setActiveTab] = useState<TabType>("available");
   const navigate = useNavigate();
@@ -25,7 +29,7 @@ const Gaming = () => {
   const queryClient = useQueryClient();
 
   // Enhanced query configuration with better caching strategy
-  const { data: profile, isLoading: isLoadingBalance } = useQuery({
+  const { data: profile, isLoading: isLoadingBalance } = useQuery<Profile | null>({
     queryKey: ["profile", user?.id],
     queryFn: async () => {
       if (!user) return null;
@@ -50,7 +54,7 @@ const Gaming = () => {
     gcTime: 5 * 60 * 1000, // Keep unused data in cache for 5 minutes
     initialData: () => {
       // Use existing cached data if available
-      return queryClient.getQueryData(["profile", user?.id]);
+      return queryClient.getQueryData<Profile>(["profile", user?.id]);
     }
   });
 
@@ -71,7 +75,7 @@ const Gaming = () => {
         (payload) => {
           // Update the cached wallet balance
           if (payload.new) {
-            queryClient.setQueryData(["profile", user?.id], {
+            queryClient.setQueryData<Profile>(["profile", user?.id], {
               wallet_balance: (payload.new as any).wallet_balance
             });
           }
