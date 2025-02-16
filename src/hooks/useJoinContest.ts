@@ -18,18 +18,18 @@ export const useJoinContest = (user: User | null) => {
         .select("id")
         .eq("user_id", user.id)
         .eq("contest_id", contestId)
-        .single();
+        .maybeSingle();
 
       if (existingParticipation) {
         throw new Error("You have already joined this contest");
       }
 
-      // Get contest details with FOR UPDATE to lock the row
+      // Get contest details
       const { data: contest, error: contestError } = await supabase
         .from("contests")
         .select("entry_fee, current_participants, max_participants")
         .eq("id", contestId)
-        .single();
+        .maybeSingle();
 
       if (contestError) throw contestError;
       if (!contest) throw new Error("Contest not found");
@@ -44,7 +44,7 @@ export const useJoinContest = (user: User | null) => {
         .from("profiles")
         .select("wallet_balance")
         .eq("id", user.id)
-        .single();
+        .maybeSingle();
 
       if (profileError) throw profileError;
       if (!profile) throw new Error("Profile not found");
@@ -71,8 +71,7 @@ export const useJoinContest = (user: User | null) => {
         .update({ 
           current_participants: contest.current_participants + 1 
         })
-        .eq("id", contestId)
-        .select();
+        .eq("id", contestId);
 
       if (updateError) {
         // Rollback participation if update fails
