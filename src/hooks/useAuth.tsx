@@ -29,13 +29,8 @@ export const useAuth = () => {
 
   const signOut = async () => {
     try {
-      // First attempt to sign out from Supabase
-      const { error } = await supabase.auth.signOut();
-      
-      // Even if there's an error, proceed with local cleanup
-      if (error) {
-        console.error('Supabase signOut error:', error);
-      }
+      // First clear the session state
+      setSession(null);
 
       // Clear all session data from localStorage
       const keys = Object.keys(localStorage);
@@ -44,26 +39,24 @@ export const useAuth = () => {
           localStorage.removeItem(key);
         }
       });
-      
-      // Clear the session state
-      setSession(null);
-      
+
+      // Attempt to sign out from Supabase
+      await supabase.auth.signOut();
+
       toast({
         title: "Signed out",
         description: "You have been successfully signed out"
       });
 
-      // Navigate to home page after successful sign out
+      // Navigate to home page
       navigate('/');
     } catch (error) {
       console.error('Error during sign out:', error);
-      // Ensure user sees success message even if there was an error
-      // since we've cleared their local session
+      // Even if there's an error, we've already cleared the local state
       toast({
         title: "Signed out",
         description: "Session has been cleared"
       });
-      // Still navigate to home page even if there was an error
       navigate('/');
     }
   };
