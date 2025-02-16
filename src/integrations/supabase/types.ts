@@ -9,6 +9,45 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      contest_games: {
+        Row: {
+          contest_id: string
+          created_at: string | null
+          game_content_id: string
+          id: string
+          sequence_number: number
+        }
+        Insert: {
+          contest_id: string
+          created_at?: string | null
+          game_content_id: string
+          id?: string
+          sequence_number: number
+        }
+        Update: {
+          contest_id?: string
+          created_at?: string | null
+          game_content_id?: string
+          id?: string
+          sequence_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contest_games_contest_id_fkey"
+            columns: ["contest_id"]
+            isOneToOne: false
+            referencedRelation: "contests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contest_games_game_content_id_fkey"
+            columns: ["game_content_id"]
+            isOneToOne: false
+            referencedRelation: "game_content"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contests: {
         Row: {
           created_at: string | null
@@ -56,6 +95,111 @@ export type Database = {
           title?: string
         }
         Relationships: []
+      }
+      game_content: {
+        Row: {
+          category: Database["public"]["Enums"]["game_category"]
+          content: Json
+          created_at: string | null
+          created_by: string | null
+          difficulty_level: number | null
+          id: string
+          is_active: boolean | null
+          last_used_at: string | null
+        }
+        Insert: {
+          category: Database["public"]["Enums"]["game_category"]
+          content: Json
+          created_at?: string | null
+          created_by?: string | null
+          difficulty_level?: number | null
+          id?: string
+          is_active?: boolean | null
+          last_used_at?: string | null
+        }
+        Update: {
+          category?: Database["public"]["Enums"]["game_category"]
+          content?: Json
+          created_at?: string | null
+          created_by?: string | null
+          difficulty_level?: number | null
+          id?: string
+          is_active?: boolean | null
+          last_used_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "game_content_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      player_game_progress: {
+        Row: {
+          completed_at: string | null
+          contest_id: string
+          created_at: string | null
+          game_content_id: string
+          id: string
+          is_correct: boolean | null
+          player_answer: Json | null
+          score: number | null
+          started_at: string | null
+          time_taken: number | null
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          contest_id: string
+          created_at?: string | null
+          game_content_id: string
+          id?: string
+          is_correct?: boolean | null
+          player_answer?: Json | null
+          score?: number | null
+          started_at?: string | null
+          time_taken?: number | null
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          contest_id?: string
+          created_at?: string | null
+          game_content_id?: string
+          id?: string
+          is_correct?: boolean | null
+          player_answer?: Json | null
+          score?: number | null
+          started_at?: string | null
+          time_taken?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "player_game_progress_contest_id_fkey"
+            columns: ["contest_id"]
+            isOneToOne: false
+            referencedRelation: "contests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "player_game_progress_game_content_id_fkey"
+            columns: ["game_content_id"]
+            isOneToOne: false
+            referencedRelation: "game_content"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "player_game_progress_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -188,7 +332,7 @@ export type Database = {
       }
     }
     Enums: {
-      [_ in never]: never
+      game_category: "arrange_sort" | "trivia" | "spot_difference"
     }
     CompositeTypes: {
       [_ in never]: never
