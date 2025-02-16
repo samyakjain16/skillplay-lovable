@@ -22,7 +22,7 @@ export const useJoinContest = (user: User | null) => {
     mutationFn: async (contestId: string) => {
       if (!user?.id) throw new Error("User not authenticated");
 
-      const { data, error } = await supabase.rpc<JoinContestResponse, JoinContestParams>(
+      const { data, error } = await supabase.rpc<JoinContestResponse>(
         'join_contest',
         {
           p_user_id: user.id,
