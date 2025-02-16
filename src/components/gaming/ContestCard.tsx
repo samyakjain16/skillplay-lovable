@@ -53,7 +53,13 @@ export const ContestCard = ({ contest, onStart, isStarting, onJoin, isJoining, i
               onClick={() => {
                 const now = new Date();
                 const startTime = new Date(contest.start_time);
+                const endTime = new Date(contest.end_time);
                 const isFullyBooked = contest.current_participants >= contest.max_participants;
+                
+                // Don't allow any actions if the contest has ended
+                if (now > endTime) {
+                  return;
+                }
                 
                 if (isFullyBooked && startTime <= now && contest.status === 'upcoming') {
                   onStart?.(contest.id);
