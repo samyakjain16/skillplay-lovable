@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
@@ -7,11 +6,57 @@ import { useToast } from "@/components/ui/use-toast";
 import { Trophy, Users, Clock, Award, Hash, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
+import { useEffect } from "react";
 
 export const AvailableContests = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Set up real-time subscription
+  useEffect(() => {
+    const channel = supabase
+      .channel('contests-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'contests'
+        },
+        (payload) => {
+          // Update the cache with the new data
+          queryClient.setQueryData(['available-contests'], (oldData: any) => {
+            if (!oldData) return oldData;
+            
+            // If it's a DELETE, remove the contest
+            if (payload.eventType === 'DELETE') {
+              return oldData.filter((contest: any) => contest.id !== payload.old.id);
+            }
+            
+            // For INSERT or UPDATE, update the contest data
+            const updatedContests = oldData.map((contest: any) => {
+              if (contest.id === payload.new.id) {
+                return { ...contest, ...payload.new };
+              }
+              return contest;
+            });
+            
+            // If it's an INSERT and the contest wasn't found in the map
+            if (payload.eventType === 'INSERT' && !updatedContests.find((c: any) => c.id === payload.new.id)) {
+              updatedContests.push(payload.new);
+            }
+            
+            return updatedContests;
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   // Query to get user's joined contests
   const { data: joinedContests } = useQuery({

@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
@@ -7,11 +6,45 @@ import { useToast } from "@/components/ui/use-toast";
 import { Trophy, Users, Clock, Award, Hash, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
+import { useEffect } from "react";
 
 export const MyContests = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('my-contests-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'contests'
+        },
+        (payload) => {
+          queryClient.setQueryData(['my-contests'], (oldData: any) => {
+            if (!oldData) return oldData;
+            
+            return oldData.map((participation: any) => {
+              if (participation.contest.id === payload.new?.id) {
+                return {
+                  ...participation,
+                  contest: { ...participation.contest, ...payload.new }
+                };
+              }
+              return participation;
+            });
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   const startContestMutation = useMutation({
     mutationFn: async (contestId: string) => {
