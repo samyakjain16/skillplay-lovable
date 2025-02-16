@@ -9,7 +9,6 @@ export const Navigation = () => {
   const [isOpen, setIsOpen] = useState(false);
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
 
   const handleAuthAction = () => {
     if (user) {
@@ -18,11 +17,6 @@ export const Navigation = () => {
       navigate('/auth');
     }
   };
-
-  // Check if we're in the gaming section
-  const isGamingSection = location.pathname.includes('/gaming') || 
-                         location.pathname.includes('/contests') || 
-                         location.pathname.includes('/my-contests');
 
   return (
     <nav className="fixed w-full bg-white/80 backdrop-blur-md z-50 border-b border-gray-200">
@@ -33,9 +27,6 @@ export const Navigation = () => {
           </div>
           
           <div className="hidden md:flex items-center space-x-8">
-            {isGamingSection && user && (
-              <Button onClick={() => navigate('/gaming')}>Go to Contests</Button>
-            )}
             {user ? (
               <Button variant="outline" onClick={() => signOut()}>Sign Out</Button>
             ) : (
@@ -57,9 +48,6 @@ export const Navigation = () => {
       {isOpen && (
         <div className="md:hidden">
           <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-            {isGamingSection && user && (
-              <Button className="w-full" onClick={() => navigate('/gaming')}>Go to Contests</Button>
-            )}
             {user ? (
               <Button className="w-full mt-2" variant="outline" onClick={() => signOut()}>Sign Out</Button>
             ) : (
