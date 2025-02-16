@@ -26,8 +26,8 @@ export const AvailableContests = () => {
   const queryClient = useQueryClient();
   const joinContestMutation = useJoinContest(user);
 
-  // Set up real-time subscription
-  useContestRealtime(queryClient);
+  // Set up real-time subscription without passing any arguments
+  useContestRealtime();
 
   // Query to get user's joined contests
   const { data: joinedContests } = useQuery({
