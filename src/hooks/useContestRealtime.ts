@@ -108,10 +108,11 @@ export const useContestRealtime = () => {
           // Invalidate my-contests query to trigger a refetch
           queryClient.invalidateQueries({ queryKey: ['my-contests'] });
 
-          // If it's a status update, also invalidate the specific contest query
-          if (payload.new?.contest_id) {
+          // Type guard to ensure payload.new is UserContest
+          const newUserContest = payload.new as UserContest;
+          if (newUserContest && 'contest_id' in newUserContest) {
             queryClient.invalidateQueries({ 
-              queryKey: ['contest', payload.new.contest_id] 
+              queryKey: ['contest', newUserContest.contest_id] 
             });
           }
         }
