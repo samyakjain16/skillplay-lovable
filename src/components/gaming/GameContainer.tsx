@@ -62,8 +62,7 @@ export const GameContainer = ({
       if (error) throw error;
       return data;
     },
-    enabled: isContestEnded,
-    refetchInterval: isContestEnded ? 5000 : false // Refresh every 5 seconds while showing leaderboard
+    enabled: isContestEnded
   });
 
   // Update progress bar
@@ -75,19 +74,6 @@ export const GameContainer = ({
       setProgress(0);
     }
   }, [remainingTime, GAME_DURATION, gameStartTime]);
-
-  useEffect(() => {
-    if (contestGames && completedGames && currentGameIndex < contestGames.length) {
-      const currentGameContentId = contestGames[currentGameIndex].game_content_id;
-      if (completedGames.includes(currentGameContentId)) {
-        const nextIndex = currentGameIndex + 1;
-        if (nextIndex < contestGames.length) {
-          setCurrentGameIndex(nextIndex);
-          setGameStartTime(new Date());
-        }
-      }
-    }
-  }, [contestGames, completedGames, currentGameIndex]);
 
   const handleGameEnd = async (score: number) => {
     if (!user || !contestGames) return;
@@ -179,45 +165,27 @@ export const GameContainer = ({
           <h2 className="text-2xl font-semibold mb-4">Contest Ended</h2>
           
           {leaderboardLoading ? (
-            <div className="flex flex-col items-center justify-center py-8 space-y-4">
+            <div className="flex flex-col items-center justify-center py-8">
               <Loader2 className="h-8 w-8 animate-spin" />
-              <p className="text-muted-foreground">Calculating final results...</p>
+              <p>Loading results...</p>
             </div>
           ) : leaderboard && leaderboard.length > 0 ? (
-            <div className="space-y-6">
-              <h3 className="text-xl font-medium">Final Leaderboard</h3>
+            <div className="space-y-4">
               <div className="divide-y max-w-md mx-auto">
                 {leaderboard.map((entry: any) => (
                   <div 
                     key={entry.user_id} 
                     className="py-3 flex justify-between items-center"
                   >
-                    <div className="flex items-center gap-3">
-                      <span className={`font-semibold ${entry.rank <= 3 ? 'text-primary text-lg' : ''}`}>
-                        #{entry.rank}
-                      </span>
-                      <div className="text-left">
-                        <div className="font-medium">Player {entry.user_id.slice(0, 8)}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {entry.games_completed} games completed
-                        </div>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-semibold">{entry.total_score}</div>
-                      <div className="text-sm text-muted-foreground">
-                        Avg: {Math.round(entry.average_time)}s
-                      </div>
-                    </div>
+                    <span className="font-medium">#{entry.rank}</span>
+                    <span>Score: {entry.total_score}</span>
                   </div>
                 ))}
               </div>
             </div>
           ) : (
-            <div className="py-8 text-center">
-              <p className="text-muted-foreground">
-                No results available yet. Please check back in a moment.
-              </p>
+            <div className="py-8">
+              <p>No results available yet. Please check back later.</p>
             </div>
           )}
         </div>
