@@ -27,6 +27,14 @@ interface AvailableContest extends Contest {
   series_count: number;
 }
 
+interface UserContest {
+  id: string;
+  user_id: string;
+  contest_id: string;
+  status: string;
+  joined_at: string;
+}
+
 export const useContestRealtime = () => {
   const queryClient = useQueryClient();
 
@@ -84,6 +92,20 @@ export const useContestRealtime = () => {
               return { ...oldData, ...newContest };
             }
           );
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_contests'
+        },
+        (payload: RealtimePostgresChangesPayload<UserContest>) => {
+          console.log('Received user contest update:', payload);
+          
+          // Invalidate my-contests query to trigger a refetch
+          queryClient.invalidateQueries({ queryKey: ['my-contests'] });
         }
       )
       .subscribe();
