@@ -135,4 +135,5 @@ export const useContestRealtime = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [
+  }, [queryClient]);
+};
