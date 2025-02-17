@@ -1,3 +1,4 @@
+// GameContainer.tsx
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -67,7 +68,9 @@ export const GameContainer = ({ contestId, onGameComplete, initialProgress }) =>
   return (
     <div>
       <h3>Game {currentGameIndex + 1} of {contestGames.length}</h3>
-      {remainingTime !== null && <CountdownTimer seconds={remainingTime} onEnd={() => handleGameEnd(0)} />}
+      {gameStartTime && (
+        <CountdownTimer targetDate={new Date(gameStartTime.getTime() + remainingTime * 1000)} onEnd={() => handleGameEnd(0)} />
+      )}
       <button onClick={() => handleGameEnd(10)}>Submit Score</button>
     </div>
   );
