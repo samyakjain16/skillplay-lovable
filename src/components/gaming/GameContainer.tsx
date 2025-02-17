@@ -52,41 +52,50 @@ export const GameContainer = ({
     setGameStartTime
   });
 
-  // Fetch leaderboard if contest has ended
+  // Fetch leaderboard with player details
   const { data: leaderboard, isLoading: leaderboardLoading } = useQuery({
     queryKey: ["contest-leaderboard", contestId],
     queryFn: async () => {
       console.log("Fetching leaderboard for contest:", contestId);
-      const { data, error } = await supabase
+      
+      // First get all player progress for this contest
+      const { data: progressData, error: progressError } = await supabase
         .from('player_game_progress')
-        .select('user_id, score')
-        .eq('contest_id', contestId)
-        .order('score', { ascending: false });
+        .select(`
+          user_id,
+          score,
+          profiles:user_id (
+            username,
+            avatar_url
+          )
+        `)
+        .eq('contest_id', contestId);
 
-      if (error) {
-        console.error("Error fetching leaderboard:", error);
-        throw error;
-      }
+      if (progressError) throw progressError;
 
-      // Process the data to calculate ranks
-      const processedData = data.reduce((acc: any[], curr: any, index: number) => {
-        const existingEntry = acc.find(entry => entry.user_id === curr.user_id);
-        if (existingEntry) {
-          existingEntry.total_score += curr.score;
+      // Process the data to calculate total scores and ranks
+      const playerScores = progressData.reduce((acc: any, curr: any) => {
+        const existingPlayer = acc.find((p: any) => p.user_id === curr.user_id);
+        if (existingPlayer) {
+          existingPlayer.total_score += curr.score;
         } else {
           acc.push({
             user_id: curr.user_id,
             total_score: curr.score,
-            rank: index + 1
+            username: curr.profiles?.username || 'Unknown Player',
+            avatar_url: curr.profiles?.avatar_url
           });
         }
         return acc;
       }, []);
 
-      // Sort by total score and assign ranks
-      return processedData
-        .sort((a, b) => b.total_score - a.total_score)
-        .map((entry, index) => ({ ...entry, rank: index + 1 }));
+      // Sort by score and assign ranks
+      return playerScores
+        .sort((a: any, b: any) => b.total_score - a.total_score)
+        .map((player: any, index: number) => ({
+          ...player,
+          rank: index + 1
+        }));
     },
     enabled: !!contestId && isContestEnded
   });
@@ -188,7 +197,7 @@ export const GameContainer = ({
       <Card className="p-6">
         <div className="text-center">
           <Trophy className="w-16 h-16 mx-auto text-primary mb-4" />
-          <h2 className="text-2xl font-semibold mb-4">Contest Ended</h2>
+          <h2 className="text-2xl font-semibold mb-4">Contest Results</h2>
           
           {leaderboardLoading ? (
             <div className="flex flex-col items-center justify-center py-8">
@@ -198,13 +207,18 @@ export const GameContainer = ({
           ) : leaderboard && leaderboard.length > 0 ? (
             <div className="space-y-4">
               <div className="divide-y max-w-md mx-auto">
-                {leaderboard.map((entry: any, index: number) => (
+                {leaderboard.map((entry: any) => (
                   <div 
-                    key={`${entry.user_id}-${index}`}
-                    className="py-3 flex justify-between items-center"
+                    key={entry.user_id}
+                    className={`py-3 flex justify-between items-center ${
+                      entry.user_id === user?.id ? 'bg-muted/50 rounded-md px-3' : ''
+                    }`}
                   >
-                    <span className="font-medium">#{entry.rank}</span>
-                    <span>Score: {entry.total_score}</span>
+                    <div className="flex items-center gap-3">
+                      <span className="font-medium">#{entry.rank}</span>
+                      <span>{entry.username}</span>
+                    </div>
+                    <span className="font-semibold">{entry.total_score} pts</span>
                   </div>
                 ))}
               </div>
