@@ -1,7 +1,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 
 interface ContestStatusButtonProps {
   contest: {
@@ -17,16 +17,17 @@ interface ContestStatusButtonProps {
   isInMyContests?: boolean;
 }
 
+// Inside your component
 export const ContestStatusButton = ({ contest, onClick, loading, disabled, isInMyContests }: ContestStatusButtonProps) => {
   const [progress, setProgress] = useState(0);
-  
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const calculateProgress = useCallback(() => {
     const now = new Date();
     const startTime = new Date(contest.start_time);
     const endTime = new Date(contest.end_time);
     const totalDuration = endTime.getTime() - startTime.getTime();
     const elapsed = now.getTime() - startTime.getTime();
-    return Math.min(Math.max((elapsed / totalDuration) * 100, 0), 100);
+    return Math.min(Math.max((elapsed / totalDuration) * 100, 0), 100); // Return progress between 0 and 100
   }, [contest.start_time, contest.end_time]);
 
   // Update progress immediately when status changes
@@ -38,26 +39,34 @@ export const ContestStatusButton = ({ contest, onClick, loading, disabled, isInM
     setProgress(calculateProgress());
   }, [contest.status, calculateProgress]);
 
-  // Set up interval for real-time updates
+  // Set up interval for real-time updates every second
   useEffect(() => {
     if (contest.status !== 'in_progress') {
       return;
     }
 
-    // Update immediately
+    // Update progress immediately
     setProgress(calculateProgress());
 
-    // Then update every second
-    const interval = setInterval(() => {
+    // Set up interval to update progress every second
+    intervalRef.current = setInterval(() => {
       const newProgress = calculateProgress();
       setProgress(newProgress);
-      
+
+      // Stop the interval once progress reaches 100%
       if (newProgress >= 100) {
-        clearInterval(interval);
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+        }
       }
     }, 1000);
 
-    return () => clearInterval(interval);
+    // Clean up interval on component unmount or when contest status changes
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
   }, [contest.status, calculateProgress]);
 
   const now = new Date();
@@ -68,7 +77,6 @@ export const ContestStatusButton = ({ contest, onClick, loading, disabled, isInM
   const hasContestStarted = now >= startTime;
 
   const getButtonContent = () => {
-    // Check for completed contests first
     if (isContestEnded) {
       return {
         text: "Completed",
@@ -79,7 +87,6 @@ export const ContestStatusButton = ({ contest, onClick, loading, disabled, isInM
       };
     }
 
-    // For My Contests section
     if (isInMyContests) {
       if (!hasContestStarted) {
         return {
@@ -87,10 +94,10 @@ export const ContestStatusButton = ({ contest, onClick, loading, disabled, isInM
           variant: "secondary" as const,
           disabled: true,
           showProgress: false,
-          customClass: "bg-[#333333] hover:bg-[#333333] text-white"
+          customClass: ""
         };
       }
-      
+
       if (contest.status === 'in_progress') {
         return {
           text: "Start Contest",
@@ -120,7 +127,6 @@ export const ContestStatusButton = ({ contest, onClick, loading, disabled, isInM
       };
     }
 
-    // Available Contests section
     if (isContestFull) {
       return {
         text: "Contest Full",
@@ -171,13 +177,10 @@ export const ContestStatusButton = ({ contest, onClick, loading, disabled, isInM
         
         {/* Progress bar overlay */}
         {buttonContent.showProgress && (
-          <div 
-            className="absolute left-0 bottom-0 h-1 bg-primary/20"
-            style={{ width: '100%' }}
-          >
+          <div className="absolute left-0 bottom-0 h-1 bg-primary/20" style={{ width: '100%' }}>
             <div 
-              className="h-full bg-primary"
-              style={{ 
+              className="h-full bg-primary" 
+              style={{
                 width: `${progress}%`,
                 transition: 'width 0.5s linear'
               }}
