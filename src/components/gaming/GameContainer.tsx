@@ -11,6 +11,7 @@ import { useContest } from "./hooks/useContest";
 import { useContestGames } from "./hooks/useContestGames";
 import { useGameProgress } from "./hooks/useGameProgress";
 import { useToast } from "@/components/ui/use-toast";
+import { useQuery } from "@tanstack/react-query";
 
 type PlayerGameProgress = Database["public"]["Tables"]["player_game_progress"]["Insert"];
 
@@ -38,7 +39,7 @@ export const GameContainer = ({
 
   const { data: contest } = useContest(contestId);
   const { data: contestGames, isLoading } = useContestGames(contestId);
-  const { remainingTime, GAME_DURATION, completedGames } = useGameProgress({
+  const { remainingTime, GAME_DURATION, completedGames, isContestEnded } = useGameProgress({
     user,
     contestId,
     currentGameIndex,
@@ -47,6 +48,19 @@ export const GameContainer = ({
     contest,
     setCurrentGameIndex,
     setGameStartTime
+  });
+
+  // Fetch leaderboard if contest has ended
+  const { data: leaderboard } = useQuery({
+    queryKey: ["contest-leaderboard", contestId],
+    queryFn: async () => {
+      if (!isContestEnded) return null;
+      const { data, error } = await supabase
+        .rpc('get_contest_leaderboard', { contest_id: contestId });
+      if (error) throw error;
+      return data;
+    },
+    enabled: isContestEnded
   });
 
   useEffect(() => {
@@ -115,19 +129,22 @@ export const GameContainer = ({
       }
 
       // Update user contest progress
+      const updateData = {
+        current_game_index: isFinalGame ? currentGameIndex : currentGameIndex + 1,
+        current_game_score: score,
+        current_game_start_time: isFinalGame ? null : new Date().toISOString(),
+        status: isFinalGame ? 'completed' : 'active'
+      };
+
       await supabase
         .from('user_contests')
-        .update({
-          current_game_index: isFinalGame ? currentGameIndex : currentGameIndex + 1,
-          current_game_score: score,
-          current_game_start_time: isFinalGame ? null : new Date().toISOString()
-        })
+        .update(updateData)
         .eq('contest_id', contestId)
         .eq('user_id', user.id);
 
       onGameComplete(score, isFinalGame);
       
-      if (!isFinalGame) {
+      if (!isFinalGame && !isContestEnded) {
         setCurrentGameIndex(prev => prev + 1);
         setGameStartTime(new Date());
       }
@@ -140,6 +157,29 @@ export const GameContainer = ({
       });
     }
   };
+
+  if (isContestEnded) {
+    return (
+      <Card className="p-6">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold mb-4">Contest Ended</h2>
+          {leaderboard && (
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">Final Leaderboard</h3>
+              <div className="divide-y">
+                {leaderboard.map((entry: any) => (
+                  <div key={entry.user_id} className="py-2 flex justify-between">
+                    <span>Rank #{entry.rank}</span>
+                    <span>Score: {entry.total_score}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </Card>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -175,7 +215,7 @@ export const GameContainer = ({
         </h3>
         {gameStartTime && remainingTime > 0 && (
           <div className="text-sm font-medium">
-            <CountdownTimer 
+            Time Remaining: <CountdownTimer 
               targetDate={new Date(gameStartTime.getTime() + (remainingTime * 1000))} 
               onEnd={() => handleGameEnd(0)} 
             />

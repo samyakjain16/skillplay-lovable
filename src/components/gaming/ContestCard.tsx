@@ -3,6 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ContestDetails } from "./ContestCard/ContestDetails";
 import { ContestStatusButton } from "./ContestStatusButton";
 import { useToast } from "@/components/ui/use-toast";
+import { useNavigate } from "react-router-dom";
 
 interface Contest {
   id: string;
@@ -26,23 +27,38 @@ interface ContestCardProps {
   onJoin?: (contestId: string) => void;
   isJoining?: boolean;
   isInMyContests?: boolean;
+  userCompletedGames?: boolean;
 }
 
-export const ContestCard = ({ contest, onStart, isStarting, onJoin, isJoining, isInMyContests }: ContestCardProps) => {
+export const ContestCard = ({ 
+  contest, 
+  onStart, 
+  isStarting, 
+  onJoin, 
+  isJoining, 
+  isInMyContests,
+  userCompletedGames 
+}: ContestCardProps) => {
   const totalPrizePool = contest.current_participants * contest.entry_fee;
   const { toast } = useToast();
+  const navigate = useNavigate();
   
   const handleContestAction = () => {
     const now = new Date();
     const startTime = new Date(contest.start_time);
     const endTime = new Date(contest.end_time);
     
-    // Don't allow any actions if the contest has ended
+    // Handle completed contests
     if (now > endTime) {
+      navigate(`/contest/${contest.id}`);
+      return;
+    }
+
+    // Handle in-progress contests where user has completed their games
+    if (userCompletedGames && now < endTime) {
       toast({
-        variant: "destructive",
-        title: "Contest Ended",
-        description: "This contest has already ended."
+        title: "Contest Still in Progress",
+        description: "Please wait for the contest to end to see final results.",
       });
       return;
     }
@@ -50,7 +66,6 @@ export const ContestCard = ({ contest, onStart, isStarting, onJoin, isJoining, i
     // For My Contests
     if (isInMyContests) {
       if (now >= startTime && contest.status !== 'completed') {
-        console.log('Starting contest:', contest.id);
         onStart?.(contest.id);
       }
       return;
@@ -63,7 +78,10 @@ export const ContestCard = ({ contest, onStart, isStarting, onJoin, isJoining, i
   };
   
   return (
-    <Card className="w-full">
+    <Card 
+      className="w-full transition-all duration-200 hover:shadow-lg cursor-pointer"
+      onClick={handleContestAction}
+    >
       <CardContent className="p-6">
         <div className="space-y-4">
           <div>
@@ -85,6 +103,7 @@ export const ContestCard = ({ contest, onStart, isStarting, onJoin, isJoining, i
               onClick={handleContestAction}
               loading={isStarting || isJoining}
               isInMyContests={isInMyContests}
+              userCompletedGames={userCompletedGames}
             />
           </div>
         </div>

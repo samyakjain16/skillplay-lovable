@@ -335,6 +335,18 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      get_contest_leaderboard: {
+        Args: {
+          contest_id: string
+        }
+        Returns: {
+          user_id: string
+          total_score: number
+          games_completed: number
+          average_time: number
+          rank: number
+        }[]
+      }
       join_contest: {
         Args: {
           p_user_id: string

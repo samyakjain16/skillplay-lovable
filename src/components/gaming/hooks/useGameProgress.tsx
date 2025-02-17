@@ -20,6 +20,7 @@ interface GameProgressReturn {
   remainingTime: number;
   GAME_DURATION: number;
   completedGames: string[] | undefined;
+  isContestEnded: boolean;
 }
 
 export const useGameProgress = ({
@@ -33,8 +34,9 @@ export const useGameProgress = ({
   setGameStartTime
 }: UseGameProgressProps): GameProgressReturn => {
   const { toast } = useToast();
-  const [remainingTime, setRemainingTime] = useState<number>(30); // Default to GAME_DURATION
-  const GAME_DURATION = 30; // Game duration in seconds
+  const [remainingTime, setRemainingTime] = useState<number>(30);
+  const [isContestEnded, setIsContestEnded] = useState(false);
+  const GAME_DURATION = 30;
 
   // Fetch player's completed games
   const { data: completedGames } = useQuery({
@@ -63,14 +65,26 @@ export const useGameProgress = ({
 
     const now = new Date();
     const contestStart = new Date(contest.start_time);
+    const contestEnd = new Date(contest.end_time);
+
+    // Check if contest has ended
+    if (now > contestEnd) {
+      setIsContestEnded(true);
+      setRemainingTime(0);
+      return;
+    }
+
+    // Calculate total elapsed time since contest start
     const totalElapsedTime = Math.max(0, now.getTime() - contestStart.getTime()) / 1000;
     
-    let appropriateGameIndex = Math.min(
+    // Calculate which game we should be on based on elapsed time
+    const expectedGameIndex = Math.min(
       Math.floor(totalElapsedTime / GAME_DURATION),
       contestGames.length - 1
     );
 
-    // Find next uncompleted game
+    // Find next uncompleted game if current one is completed
+    let appropriateGameIndex = expectedGameIndex;
     if (completedGames && completedGames.length > 0) {
       while (
         appropriateGameIndex < contestGames.length && 
@@ -83,17 +97,21 @@ export const useGameProgress = ({
       }
     }
 
+    // If we don't have a game start time, calculate it based on contest progress
     if (!gameStartTime) {
+      // Calculate time into current game segment
       const timeIntoCurrentGame = totalElapsedTime % GAME_DURATION;
       const newRemainingTime = Math.max(0, GAME_DURATION - timeIntoCurrentGame);
       setRemainingTime(newRemainingTime);
       
+      // Calculate when this game segment started
       const newStartTime = new Date(now.getTime() - (timeIntoCurrentGame * 1000));
       
       if (appropriateGameIndex !== currentGameIndex) {
         setCurrentGameIndex(appropriateGameIndex);
         setGameStartTime(newStartTime);
 
+        // Update progress in database
         if (user) {
           supabase
             .from('user_contests')
@@ -116,6 +134,7 @@ export const useGameProgress = ({
         }
       }
     } else {
+      // Calculate remaining time based on game start time
       const elapsed = (now.getTime() - gameStartTime.getTime()) / 1000;
       const remaining = Math.max(0, GAME_DURATION - elapsed);
       setRemainingTime(remaining);
@@ -125,6 +144,7 @@ export const useGameProgress = ({
   return {
     remainingTime,
     GAME_DURATION,
-    completedGames
+    completedGames,
+    isContestEnded
   };
 };
