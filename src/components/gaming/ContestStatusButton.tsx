@@ -87,7 +87,7 @@ export const ContestStatusButton = ({ contest, onClick, loading, disabled, isInM
           variant: "secondary" as const,
           disabled: true,
           showProgress: false,
-          customClass: ""
+          customClass: "bg-[#333333] hover:bg-[#333333] text-white"
         };
       }
       
