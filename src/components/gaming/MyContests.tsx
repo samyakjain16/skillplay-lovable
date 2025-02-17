@@ -1,3 +1,4 @@
+
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
@@ -101,13 +102,24 @@ export const MyContests = () => {
 
       const now = new Date();
 
+      // Update status of contests that should be in progress
       const { error: updateError } = await supabase
+        .from("contests")
+        .update({ status: "in_progress" })
+        .lt("start_time", now.toISOString())
+        .gt("end_time", now.toISOString())
+        .eq("status", "upcoming");
+
+      if (updateError) console.error("Error updating contest statuses:", updateError);
+
+      // Update status of completed contests
+      const { error: completeError } = await supabase
         .from("contests")
         .update({ status: "completed" })
         .lt("end_time", now.toISOString())
         .neq("status", "completed");
 
-      if (updateError) console.error("Error updating contest statuses:", updateError);
+      if (completeError) console.error("Error updating completed contests:", completeError);
 
       const { data, error } = await supabase
         .from("user_contests")
@@ -118,14 +130,23 @@ export const MyContests = () => {
       if (error) throw error;
 
       return data.map((participation: Participation) => {
-        if (new Date(participation.contest.end_time) < now) {
+        const now = new Date();
+        const startTime = new Date(participation.contest.start_time);
+        const endTime = new Date(participation.contest.end_time);
+
+        // Update status based on current time
+        if (endTime < now) {
           participation.contest.status = "completed";
+        } else if (startTime <= now && now < endTime) {
+          participation.contest.status = "in_progress";
         }
+        
         return participation;
       });
     },
     enabled: !!user?.id,
-    staleTime: 60000, // Reduce unnecessary fetches
+    refetchInterval: 10000, // Refetch every 10 seconds to check for status updates
+    staleTime: 5000, // Consider data stale after 5 seconds
   });
 
   if (isLoading) return <div>Loading your contests...</div>;

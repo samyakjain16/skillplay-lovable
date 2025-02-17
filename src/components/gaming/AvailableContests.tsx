@@ -57,6 +57,7 @@ export const AvailableContests = () => {
       if (error) throw error;
       return data;
     },
+    refetchInterval: 10000, // Refetch every 10 seconds to check for status updates
   });
 
   if (isLoading) {
