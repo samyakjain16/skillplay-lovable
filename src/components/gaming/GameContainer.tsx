@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Loader2, Trophy } from "lucide-react";
@@ -58,9 +57,9 @@ export const GameContainer = ({
     queryFn: async () => {
       console.log("Fetching leaderboard for contest:", contestId);
       
-      // First get all player progress for this contest
-      const { data: progressData, error: progressError } = await supabase
-        .from('player_game_progress')
+      // First get all users who joined the contest
+      const { data: contestUsers, error: usersError } = await supabase
+        .from('user_contests')
         .select(`
           user_id,
           score,
@@ -71,26 +70,18 @@ export const GameContainer = ({
         `)
         .eq('contest_id', contestId);
 
-      if (progressError) throw progressError;
+      if (usersError) throw usersError;
 
-      // Process the data to calculate total scores and ranks
-      const playerScores = progressData.reduce((acc: any, curr: any) => {
-        const existingPlayer = acc.find((p: any) => p.user_id === curr.user_id);
-        if (existingPlayer) {
-          existingPlayer.total_score += curr.score;
-        } else {
-          acc.push({
-            user_id: curr.user_id,
-            total_score: curr.score,
-            username: curr.profiles?.username || 'Unknown Player',
-            avatar_url: curr.profiles?.avatar_url
-          });
-        }
-        return acc;
-      }, []);
+      // Map the users to leaderboard entries
+      const leaderboardEntries = contestUsers.map((user: any) => ({
+        user_id: user.user_id,
+        total_score: user.score || 0,
+        username: user.profiles?.username || 'Unknown Player',
+        avatar_url: user.profiles?.avatar_url
+      }));
 
       // Sort by score and assign ranks
-      return playerScores
+      return leaderboardEntries
         .sort((a: any, b: any) => b.total_score - a.total_score)
         .map((player: any, index: number) => ({
           ...player,
@@ -225,8 +216,8 @@ export const GameContainer = ({
             </div>
           ) : (
             <div className="py-8">
-              <p>No results available yet. The leaderboard is being calculated.</p>
-              <p className="text-sm text-muted-foreground mt-2">This may take a few moments.</p>
+              <p>No participants found in this contest.</p>
+              <p className="text-sm text-muted-foreground mt-2">Try joining the contest first.</p>
             </div>
           )}
         </div>
