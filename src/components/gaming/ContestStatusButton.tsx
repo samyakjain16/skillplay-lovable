@@ -65,7 +65,7 @@ export const ContestStatusButton = ({
         variant: "secondary",
         disabled: true,
         showProgress: false,
-        customClass: "bg-[#333333] hover:bg-[#333333] text-white",
+        customClass: "bg-gray-500 text-white",
       };
     }
 
@@ -161,11 +161,16 @@ export const ContestStatusButton = ({
           buttonState.text
         )}
 
-        {buttonState.showProgress && (
-          <div 
-            className="absolute left-0 top-0 h-full bg-green-500 transition-all duration-500"
-            style={{ width: `${progress}%` }}
-          />
+        {buttonState.showProgress ? (
+          <>
+            <span className="relative z-10 text-black">Start Contest</span>
+            <div 
+              className="absolute left-0 top-0 h-full bg-green-500 transition-all duration-500"
+              style={{ width: `${progress}%` }}
+            />
+          </>
+        ) : (
+          buttonState.text
         )}
       </Button>
     </div>
