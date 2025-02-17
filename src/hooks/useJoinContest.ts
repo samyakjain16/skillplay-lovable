@@ -45,11 +45,14 @@ export const useJoinContest = (user: User | null) => {
         title: "Success!",
         description: "You have successfully joined the contest.",
       });
+      
       // Invalidate all relevant queries to update UI
       queryClient.invalidateQueries({ queryKey: ["available-contests"] });
       queryClient.invalidateQueries({ queryKey: ["my-contests"] });
       queryClient.invalidateQueries({ queryKey: ["profile"] });
-      queryClient.invalidateQueries({ queryKey: ["joined-contests"] });
+      
+      // Force an immediate refetch of my-contests to ensure immediate UI update
+      queryClient.refetchQueries({ queryKey: ["my-contests"] });
     },
     onError: (error: Error) => {
       toast({
@@ -59,7 +62,7 @@ export const useJoinContest = (user: User | null) => {
       });
       // Invalidate queries to ensure UI is in sync with server state
       queryClient.invalidateQueries({ queryKey: ["available-contests"] });
-      queryClient.invalidateQueries({ queryKey: ["joined-contests"] });
+      queryClient.invalidateQueries({ queryKey: ["my-contests"] });
     },
   });
 };

@@ -85,6 +85,12 @@ export const useContestRealtime = () => {
             }
           );
 
+          // Force refetch if status changed
+          if (payload.old && payload.old.status !== newContest.status) {
+            queryClient.invalidateQueries({ queryKey: ["my-contests"] });
+            queryClient.invalidateQueries({ queryKey: ["available-contests"] });
+          }
+
           // Update single contest query if it exists
           queryClient.setQueryData(
             ['contest', newContest.id],
@@ -105,14 +111,19 @@ export const useContestRealtime = () => {
         (payload: RealtimePostgresChangesPayload<UserContest>) => {
           console.log('Received user contest update:', payload);
           
-          // Invalidate my-contests query to trigger a refetch
+          // Force immediate refetch of my-contests
           queryClient.invalidateQueries({ queryKey: ['my-contests'] });
+          queryClient.refetchQueries({ queryKey: ['my-contests'] });
 
           // Type guard to ensure payload.new is UserContest
           const newUserContest = payload.new as UserContest;
           if (newUserContest && 'contest_id' in newUserContest) {
             queryClient.invalidateQueries({ 
               queryKey: ['contest', newUserContest.contest_id] 
+            });
+            // Also refetch available contests to update button states
+            queryClient.invalidateQueries({ 
+              queryKey: ['available-contests'] 
             });
           }
         }
