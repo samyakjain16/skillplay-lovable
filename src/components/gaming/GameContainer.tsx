@@ -42,7 +42,9 @@ export const GameContainer = ({
     currentGameIndex,
     gameStartTime,
     contestGames,
-    contest
+    contest,
+    setCurrentGameIndex,
+    setGameStartTime
   });
 
   const handleGameEnd = async (score: number) => {
