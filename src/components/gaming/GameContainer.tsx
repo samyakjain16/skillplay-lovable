@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
@@ -35,6 +34,7 @@ export const GameContainer = ({
   const [gameStartTime, setGameStartTime] = useState<Date | null>(
     initialProgress?.current_game_start_time ? new Date(initialProgress.current_game_start_time) : null
   );
+  const [remainingTime, setRemainingTime] = useState<number | null>(null);
 
   // Fetch contest details
   const { data: contest } = useQuery({
@@ -69,7 +69,7 @@ export const GameContainer = ({
     },
   });
 
-  // Calculate appropriate game index based on contest timing
+  // Calculate appropriate game index and remaining time based on contest timing
   useEffect(() => {
     if (contest && contestGames && !gameStartTime) {
       const now = new Date();
@@ -82,6 +82,16 @@ export const GameContainer = ({
         Math.floor(timeElapsed / gameDuration),
         contestGames.length - 1
       );
+
+      // Calculate remaining time for current game
+      const timeIntoCurrentGame = timeElapsed - (appropriateGameIndex * gameDuration);
+      const timeRemaining = Math.max(0, gameDuration - timeIntoCurrentGame);
+      
+      console.log('Time elapsed:', timeElapsed);
+      console.log('Time into current game:', timeIntoCurrentGame);
+      console.log('Time remaining:', timeRemaining);
+
+      setRemainingTime(timeRemaining);
 
       if (appropriateGameIndex !== currentGameIndex) {
         setCurrentGameIndex(appropriateGameIndex);
@@ -112,8 +122,9 @@ export const GameContainer = ({
   }, [contest, contestGames, currentGameIndex, gameStartTime, contestId, user, toast]);
 
   useEffect(() => {
-    if (contestGames && contestGames.length > 0 && !gameStartTime) {
-      const newStartTime = new Date();
+    if (contestGames && contestGames.length > 0 && !gameStartTime && remainingTime !== null) {
+      // Calculate the start time by subtracting the remaining time from now
+      const newStartTime = new Date(Date.now() - ((30 - remainingTime) * 1000));
       setGameStartTime(newStartTime);
       
       // Update the start time in the database
@@ -131,7 +142,7 @@ export const GameContainer = ({
           });
       }
     }
-  }, [contestGames, currentGameIndex, user, contestId, gameStartTime]);
+  }, [contestGames, currentGameIndex, user, contestId, gameStartTime, remainingTime]);
 
   const handleGameEnd = async (score: number) => {
     if (!user || !contestGames) return;
@@ -234,7 +245,8 @@ export const GameContainer = ({
   }
 
   const currentGame = contestGames[currentGameIndex];
-  const gameEndTime = gameStartTime ? new Date(gameStartTime.getTime() + 30000) : null;
+  // Calculate game end time based on the remaining time when first joining
+  const gameEndTime = gameStartTime ? new Date(gameStartTime.getTime() + (remainingTime || 30) * 1000) : null;
 
   return (
     <Card className="p-6">
