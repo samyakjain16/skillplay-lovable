@@ -163,17 +163,23 @@ export const GameContainer = ({
       <Card className="p-6">
         <div className="text-center">
           <h2 className="text-xl font-semibold mb-4">Contest Ended</h2>
-          {leaderboard && (
+          {leaderboard ? (
             <div className="space-y-4">
               <h3 className="text-lg font-medium">Final Leaderboard</h3>
               <div className="divide-y">
                 {leaderboard.map((entry: any) => (
-                  <div key={entry.user_id} className="py-2 flex justify-between">
-                    <span>Rank #{entry.rank}</span>
-                    <span>Score: {entry.total_score}</span>
+                  <div key={entry.user_id} className="py-2 flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">#{entry.rank}</span>
+                    </div>
+                    <span className="text-sm font-medium">Score: {entry.total_score}</span>
                   </div>
                 ))}
               </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin" />
             </div>
           )}
         </div>

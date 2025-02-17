@@ -1,172 +1,97 @@
+
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
-import { useEffect, useState, useCallback, useRef } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 
-interface ContestStatusButtonProps {
-  contest: {
-    id: string;
-    status: string;
-    start_time: string;
-    end_time: string;
-    current_participants: number;
-    max_participants: number;
-  };
-  onClick?: () => void;
-  loading?: boolean;
-  disabled?: boolean;
-  isInMyContests?: boolean;
+interface Contest {
+  status: string;
+  start_time: string;
+  end_time: string;
+  max_participants: number;
+  current_participants: number;
 }
 
-type ButtonState = {
-  text: string;
-  variant: "default" | "secondary";
-  disabled: boolean;
-  showProgress: boolean;
-  customClass: string;
-};
+export interface ContestStatusButtonProps {
+  contest: Contest;
+  onClick: () => void;
+  loading?: boolean;
+  isInMyContests?: boolean;
+  userCompletedGames?: boolean;
+}
 
-export const ContestStatusButton = ({ 
-  contest, 
-  onClick, 
-  loading, 
-  disabled, 
-  isInMyContests 
+export const ContestStatusButton = ({
+  contest,
+  onClick,
+  loading = false,
+  isInMyContests = false,
+  userCompletedGames = false
 }: ContestStatusButtonProps) => {
-  const [progress, setProgress] = useState(0);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const queryClient = useQueryClient();
+  const now = new Date();
+  const startTime = new Date(contest.start_time);
+  const endTime = new Date(contest.end_time);
+  const isFull = contest.current_participants >= contest.max_participants;
+  
+  if (loading) {
+    return (
+      <Button disabled className="w-full">
+        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+        {isInMyContests ? "Starting..." : "Joining..."}
+      </Button>
+    );
+  }
 
-  const getTimeStatus = useCallback(() => {
-    const now = new Date();
-    const startTime = new Date(contest.start_time);
-    const endTime = new Date(contest.end_time);
-    
-    return {
-      hasStarted: now >= startTime,
-      hasEnded: now > endTime,
-      progress: Math.min(
-        Math.max(
-          ((now.getTime() - startTime.getTime()) / (endTime.getTime() - startTime.getTime())) * 100,
-          0
-        ),
-        100
-      ),
-    };
-  }, [contest.start_time, contest.end_time]);
+  // For completed contests
+  if (now > endTime) {
+    return (
+      <Button variant="secondary" className="w-full" onClick={onClick}>
+        View Results
+      </Button>
+    );
+  }
 
-  const getContestState = useCallback((): ButtonState => {
-    const { hasStarted, hasEnded } = getTimeStatus();
-    const isContestFull = contest.current_participants >= contest.max_participants;
+  // For contests where player has completed their games
+  if (userCompletedGames && now < endTime) {
+    return (
+      <Button variant="secondary" className="w-full" onClick={onClick}>
+        In Progress
+      </Button>
+    );
+  }
 
-    if (hasEnded || contest.status === "completed") {
-      return {
-        text: "Completed",
-        variant: "secondary",
-        disabled: true,
-        showProgress: false,
-        customClass: "bg-gray-600 text-white",
-      };
+  // For My Contests
+  if (isInMyContests) {
+    if (now >= startTime && now <= endTime) {
+      return (
+        <Button className="w-full" onClick={onClick}>
+          Play Now
+        </Button>
+      );
     }
-
-    if (isInMyContests) {
-      if (!hasStarted) {
-        return {
-          text: "Pending",
-          variant: "secondary",
-          disabled: true,
-          showProgress: false,
-          customClass: "bg-gray-600 text-white",
-        };
-      }
-      return {
-        text: "Start Contest",
-        variant: "default",
-        disabled: false,
-        showProgress: true,
-        customClass: "bg-gray-300 text-black",
-      };
+    if (now < startTime) {
+      return (
+        <Button variant="secondary" className="w-full" disabled>
+          Starting Soon
+        </Button>
+      );
     }
+    return (
+      <Button variant="secondary" className="w-full" disabled>
+        Completed
+      </Button>
+    );
+  }
 
-    if (isContestFull) {
-      return {
-        text: "Contest Full",
-        variant: "secondary",
-        disabled: true,
-        showProgress: contest.status === "in_progress",
-        customClass: "bg-gray-600 text-white",
-      };
-    }
-
-    return {
-      text: "Join Contest",
-      variant: "default",
-      disabled: false,
-      showProgress: contest.status === "in_progress",
-      customClass: "bg-green-500 hover:bg-green-600 text-white",
-    };
-  }, [contest, isInMyContests, getTimeStatus]);
-
-  useEffect(() => {
-    if (contest.status !== "in_progress") {
-      setProgress(0);
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-      return;
-    }
-
-    const updateProgress = () => {
-      const { progress } = getTimeStatus();
-      setProgress(progress);
-      if (progress >= 100) {
-        clearInterval(intervalRef.current!);
-        intervalRef.current = null;
-        queryClient.invalidateQueries({ queryKey: ["contest", contest.id] });
-      }
-    };
-
-    updateProgress();
-    if (!intervalRef.current) {
-      intervalRef.current = setInterval(updateProgress, 1000);
-    }
-
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-    };
-  }, [contest.status, contest.id, getTimeStatus, queryClient]);
-
-  const buttonState = getContestState();
+  // For Available Contests
+  if (isFull) {
+    return (
+      <Button variant="secondary" className="w-full" disabled>
+        Contest Full
+      </Button>
+    );
+  }
 
   return (
-    <div className="relative w-full">
-      <Button 
-        className={`w-full relative overflow-hidden transition-all duration-500 ${buttonState.customClass}`}
-        variant={buttonState.variant}
-        disabled={disabled || buttonState.disabled}
-        onClick={onClick}
-      >
-        {loading ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            {isInMyContests ? "Starting..." : "Joining..."}
-          </>
-        ) : buttonState.showProgress ? (
-          <>
-            <span className="relative z-10 text-black">Start Contest</span>
-            <div 
-              className="absolute left-0 top-0 h-full bg-green-500 transition-all duration-500"
-              style={{ width: `${progress}%` }}
-            />
-          </>
-        ) : (
-          buttonState.text
-        )}
-      </Button>
-    </div>
+    <Button className="w-full" onClick={onClick}>
+      Join Contest
+    </Button>
   );
 };
