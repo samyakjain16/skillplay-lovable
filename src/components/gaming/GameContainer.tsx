@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,6 +10,7 @@ import { GameContent } from "./GameContent";
 import { useContest } from "./hooks/useContest";
 import { useContestGames } from "./hooks/useContestGames";
 import { useGameProgress } from "./hooks/useGameProgress";
+import { useToast } from "@/components/ui/use-toast";
 
 type PlayerGameProgress = Database["public"]["Tables"]["player_game_progress"]["Insert"];
 
@@ -29,6 +30,7 @@ export const GameContainer = ({
   initialProgress 
 }: GameContainerProps) => {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [currentGameIndex, setCurrentGameIndex] = useState(initialProgress?.current_game_index || 0);
   const [gameStartTime, setGameStartTime] = useState<Date | null>(
     initialProgress?.current_game_start_time ? new Date(initialProgress.current_game_start_time) : null
@@ -36,7 +38,7 @@ export const GameContainer = ({
 
   const { data: contest } = useContest(contestId);
   const { data: contestGames, isLoading } = useContestGames(contestId);
-  const { remainingTime, GAME_DURATION } = useGameProgress({
+  const { remainingTime, GAME_DURATION, completedGames } = useGameProgress({
     user,
     contestId,
     currentGameIndex,
@@ -47,6 +49,20 @@ export const GameContainer = ({
     setGameStartTime
   });
 
+  // Effect to prevent accessing completed games
+  useEffect(() => {
+    if (contestGames && completedGames && currentGameIndex < contestGames.length) {
+      const currentGameContentId = contestGames[currentGameIndex].game_content_id;
+      if (completedGames.includes(currentGameContentId)) {
+        const nextIndex = currentGameIndex + 1;
+        if (nextIndex < contestGames.length) {
+          setCurrentGameIndex(nextIndex);
+          setGameStartTime(new Date());
+        }
+      }
+    }
+  }, [contestGames, completedGames, currentGameIndex]);
+
   const handleGameEnd = async (score: number) => {
     if (!user || !contestGames) return;
 
@@ -55,33 +71,33 @@ export const GameContainer = ({
     const isFinalGame = currentGameIndex === contestGames.length - 1;
 
     try {
-      const { data: existingProgress } = await supabase
-        .from("player_game_progress")
-        .select("id")
-        .match({
-          user_id: user.id,
-          contest_id: contestId,
-          game_content_id: currentGame.game_content_id
-        })
-        .maybeSingle();
-
-      if (!existingProgress) {
-        const progressData: PlayerGameProgress = {
-          user_id: user.id,
-          contest_id: contestId,
-          game_content_id: currentGame.game_content_id,
-          score: score,
-          time_taken: timeSpent,
-          started_at: gameStartTime?.toISOString(),
-          completed_at: new Date().toISOString(),
-          is_correct: score > 0
-        };
-
-        await supabase
-          .from("player_game_progress")
-          .insert(progressData);
+      // Check if game is already completed
+      if (completedGames?.includes(currentGame.game_content_id)) {
+        toast({
+          variant: "destructive",
+          title: "Game already completed",
+          description: "You cannot replay a completed game"
+        });
+        return;
       }
 
+      // Record game progress
+      const progressData: PlayerGameProgress = {
+        user_id: user.id,
+        contest_id: contestId,
+        game_content_id: currentGame.game_content_id,
+        score: score,
+        time_taken: timeSpent,
+        started_at: gameStartTime?.toISOString(),
+        completed_at: new Date().toISOString(),
+        is_correct: score > 0
+      };
+
+      await supabase
+        .from("player_game_progress")
+        .insert(progressData);
+
+      // Update user contest progress
       await supabase
         .from('user_contests')
         .update({
@@ -100,6 +116,11 @@ export const GameContainer = ({
       }
     } catch (error) {
       console.error("Error in handleGameEnd:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to save game progress"
+      });
     }
   };
 
@@ -124,13 +145,16 @@ export const GameContainer = ({
     ? new Date(gameStartTime.getTime() + (remainingTime * 1000)) 
     : null;
 
+  // Check if current game is already completed
+  const isGameCompleted = completedGames?.includes(currentGame.game_content_id);
+
   return (
     <Card className="p-6">
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg font-semibold">
           Game {currentGameIndex + 1} of {contestGames.length}
         </h3>
-        {gameEndTime && (
+        {gameEndTime && !isGameCompleted && (
           <div className="text-sm font-medium">
             Time Remaining: <CountdownTimer targetDate={gameEndTime} onEnd={() => handleGameEnd(0)} />
           </div>
@@ -138,7 +162,13 @@ export const GameContainer = ({
       </div>
 
       <div className="min-h-[300px]">
-        <GameContent game={currentGame} onComplete={handleGameEnd} />
+        {isGameCompleted ? (
+          <div className="flex items-center justify-center h-full">
+            <p className="text-gray-500">This game has already been completed</p>
+          </div>
+        ) : (
+          <GameContent game={currentGame} onComplete={handleGameEnd} />
+        )}
       </div>
     </Card>
   );
