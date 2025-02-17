@@ -52,6 +52,8 @@ export const useContestRealtime = () => {
         (payload: RealtimePostgresChangesPayload<Contest>) => {
           console.log('Received contest update:', payload);
           const newContest = payload.new as Contest;
+          const oldContest = payload.old as Partial<Contest>;
+          
           if (!newContest?.id) return;
 
           // Update my-contests query data
@@ -86,7 +88,7 @@ export const useContestRealtime = () => {
           );
 
           // Force refetch if status changed
-          if (payload.old && payload.old.status !== newContest.status) {
+          if (oldContest && 'status' in oldContest && oldContest.status !== newContest.status) {
             queryClient.invalidateQueries({ queryKey: ["my-contests"] });
             queryClient.invalidateQueries({ queryKey: ["available-contests"] });
           }
