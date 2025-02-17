@@ -10,6 +10,7 @@ import type { Database } from "@/integrations/supabase/types";
 import { ArrangeSortGame } from "./games/ArrangeSortGame";
 import { TriviaGame } from "./games/TriviaGame";
 import { SpotDifferenceGame } from "./games/SpotDifferenceGame";
+import { useToast } from "@/components/ui/use-toast";
 
 type PlayerGameProgress = Database["public"]["Tables"]["player_game_progress"]["Insert"];
 
@@ -29,11 +30,28 @@ export const GameContainer = ({
   initialProgress 
 }: GameContainerProps) => {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [currentGameIndex, setCurrentGameIndex] = useState(initialProgress?.current_game_index || 0);
   const [gameStartTime, setGameStartTime] = useState<Date | null>(
     initialProgress?.current_game_start_time ? new Date(initialProgress.current_game_start_time) : null
   );
 
+  // Fetch contest details
+  const { data: contest } = useQuery({
+    queryKey: ["contest", contestId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("contests")
+        .select("*")
+        .eq("id", contestId)
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Fetch contest games
   const { data: contestGames, isLoading } = useQuery({
     queryKey: ["contest-games", contestId],
     queryFn: async () => {
@@ -50,6 +68,48 @@ export const GameContainer = ({
       return data;
     },
   });
+
+  // Calculate appropriate game index based on contest timing
+  useEffect(() => {
+    if (contest && contestGames && !gameStartTime) {
+      const now = new Date();
+      const contestStart = new Date(contest.start_time);
+      const timeElapsed = Math.max(0, now.getTime() - contestStart.getTime()) / 1000; // in seconds
+      const gameDuration = 30; // each game is 30 seconds
+
+      // Calculate which game should be current based on elapsed time
+      const appropriateGameIndex = Math.min(
+        Math.floor(timeElapsed / gameDuration),
+        contestGames.length - 1
+      );
+
+      if (appropriateGameIndex !== currentGameIndex) {
+        setCurrentGameIndex(appropriateGameIndex);
+        
+        // Update the game index in the database
+        if (user) {
+          supabase
+            .from('user_contests')
+            .update({ 
+              current_game_index: appropriateGameIndex,
+              current_game_start_time: null // Will be set when game actually starts
+            })
+            .eq('contest_id', contestId)
+            .eq('user_id', user.id)
+            .then(({ error }) => {
+              if (error) {
+                console.error('Error updating game index:', error);
+                toast({
+                  variant: "destructive",
+                  title: "Error",
+                  description: "Failed to update game progress"
+                });
+              }
+            });
+        }
+      }
+    }
+  }, [contest, contestGames, currentGameIndex, gameStartTime, contestId, user, toast]);
 
   useEffect(() => {
     if (contestGames && contestGames.length > 0 && !gameStartTime) {
