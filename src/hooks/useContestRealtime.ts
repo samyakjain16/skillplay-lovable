@@ -10,6 +10,7 @@ interface Contest {
   current_participants: number;
   start_time: string;
   end_time: string;
+  updated_at: string;
 }
 
 interface MyContestParticipation {
@@ -106,6 +107,13 @@ export const useContestRealtime = () => {
           
           // Invalidate my-contests query to trigger a refetch
           queryClient.invalidateQueries({ queryKey: ['my-contests'] });
+
+          // If it's a status update, also invalidate the specific contest query
+          if (payload.new?.contest_id) {
+            queryClient.invalidateQueries({ 
+              queryKey: ['contest', payload.new.contest_id] 
+            });
+          }
         }
       )
       .subscribe();

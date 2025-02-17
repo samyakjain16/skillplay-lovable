@@ -63,6 +63,7 @@ export type Database = {
           start_time: string
           status: string | null
           title: string
+          updated_at: string | null
         }
         Insert: {
           created_at?: string | null
@@ -78,6 +79,7 @@ export type Database = {
           start_time: string
           status?: string | null
           title: string
+          updated_at?: string | null
         }
         Update: {
           created_at?: string | null
@@ -93,6 +95,7 @@ export type Database = {
           start_time?: string
           status?: string | null
           title?: string
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -328,16 +331,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_and_update_contests: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       join_contest: {
         Args: {
           p_user_id: string
           p_contest_id: string
         }
         Returns: Json
-      }
-      update_completed_contests: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
       }
     }
     Enums: {
