@@ -17,10 +17,9 @@ interface ContestStatusButtonProps {
   isInMyContests?: boolean;
 }
 
-// ContestStatusButton Component
 export const ContestStatusButton = ({ contest, onClick, loading, disabled, isInMyContests }: ContestStatusButtonProps) => {
   const [progress, setProgress] = useState(0);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null); // To store interval ID
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const calculateProgress = useCallback(() => {
     const now = new Date();
@@ -28,46 +27,46 @@ export const ContestStatusButton = ({ contest, onClick, loading, disabled, isInM
     const endTime = new Date(contest.end_time);
     const totalDuration = endTime.getTime() - startTime.getTime();
     const elapsed = now.getTime() - startTime.getTime();
-
-    // Calculate the progress percentage, clamped between 0% and 100%
     return Math.min(Math.max((elapsed / totalDuration) * 100, 0), 100);
   }, [contest.start_time, contest.end_time]);
 
-  // Update progress immediately when status changes
+  // Update progress when contest data changes
   useEffect(() => {
     if (contest.status !== 'in_progress') {
       setProgress(0);
-      return;
-    }
-
-    // Start progress from the current start time
-    setProgress(calculateProgress());
-  }, [contest.status, calculateProgress]);
-
-  // Set up interval for real-time updates every second
-  useEffect(() => {
-    if (contest.status !== 'in_progress') {
-      return;
-    }
-
-    // Set up interval to update progress every second
-    intervalRef.current = setInterval(() => {
-      const newProgress = calculateProgress();
-      setProgress(newProgress);
-
-      // Stop the interval when the progress reaches 100% (end of contest)
-      if (newProgress >= 100) {
-        clearInterval(intervalRef.current as NodeJS.Timeout);
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
       }
-    }, 1000);
+      return;
+    }
 
-    // Clean up interval when the contest status changes or component unmounts
+    // Calculate initial progress
+    setProgress(calculateProgress());
+
+    // Set up interval for real-time updates
+    if (!intervalRef.current) {
+      intervalRef.current = setInterval(() => {
+        const newProgress = calculateProgress();
+        setProgress(newProgress);
+
+        if (newProgress >= 100) {
+          if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+            intervalRef.current = null;
+          }
+        }
+      }, 1000);
+    }
+
+    // Cleanup interval on unmount or when contest status changes
     return () => {
       if (intervalRef.current) {
-        clearInterval(intervalRef.current as NodeJS.Timeout);
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
       }
     };
-  }, [contest.status, calculateProgress]);
+  }, [contest.status, contest.start_time, contest.end_time, calculateProgress]);
 
   const now = new Date();
   const startTime = new Date(contest.start_time);
@@ -177,10 +176,13 @@ export const ContestStatusButton = ({ contest, onClick, loading, disabled, isInM
         
         {/* Progress bar overlay */}
         {buttonContent.showProgress && (
-          <div className="absolute left-0 bottom-0 h-1 bg-primary/20" style={{ width: '100%' }}>
+          <div 
+            className="absolute left-0 bottom-0 h-1 bg-primary/20"
+            style={{ width: '100%' }}
+          >
             <div 
-              className="h-full bg-primary" 
-              style={{
+              className="h-full bg-primary"
+              style={{ 
                 width: `${progress}%`,
                 transition: 'width 0.5s linear'
               }}

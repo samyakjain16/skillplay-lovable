@@ -31,6 +31,7 @@ export const useContestRealtime = () => {
   const queryClient = useQueryClient();
 
   useEffect(() => {
+    // Enable REPLICA IDENTITY FULL for contests table to ensure complete row data
     const channel = supabase
       .channel('contest-changes')
       .on(
@@ -41,10 +42,11 @@ export const useContestRealtime = () => {
           table: 'contests'
         },
         (payload: RealtimePostgresChangesPayload<Contest>) => {
+          console.log('Received contest update:', payload);
           const newContest = payload.new as Contest;
           if (!newContest?.id) return;
 
-          // Update my-contests query
+          // Update my-contests query data
           queryClient.setQueryData<MyContestParticipation[] | undefined>(
             ['my-contests'], 
             (oldData) => {
@@ -61,7 +63,7 @@ export const useContestRealtime = () => {
             }
           );
 
-          // Update available-contests query
+          // Update available-contests query data
           queryClient.setQueryData<AvailableContest[] | undefined>(
             ['available-contests'], 
             (oldData) => {
@@ -72,6 +74,15 @@ export const useContestRealtime = () => {
                 }
                 return contest;
               });
+            }
+          );
+
+          // Update single contest query if it exists
+          queryClient.setQueryData(
+            ['contest', newContest.id],
+            (oldData: any) => {
+              if (!oldData) return oldData;
+              return { ...oldData, ...newContest };
             }
           );
         }
