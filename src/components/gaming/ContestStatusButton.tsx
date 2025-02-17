@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { useEffect, useState, useCallback, useRef } from "react";
@@ -38,7 +37,6 @@ export const ContestStatusButton = ({
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const queryClient = useQueryClient();
 
-  // Centralized time-based calculations
   const getTimeStatus = useCallback(() => {
     const now = new Date();
     const startTime = new Date(contest.start_time);
@@ -47,31 +45,30 @@ export const ContestStatusButton = ({
     return {
       hasStarted: now >= startTime,
       hasEnded: now > endTime,
-      progress: Math.min(Math.max(
-        ((now.getTime() - startTime.getTime()) / 
-        (endTime.getTime() - startTime.getTime())) * 100, 
-        0
-      ), 100)
+      progress: Math.min(
+        Math.max(
+          ((now.getTime() - startTime.getTime()) / (endTime.getTime() - startTime.getTime())) * 100,
+          0
+        ),
+        100
+      ),
     };
   }, [contest.start_time, contest.end_time]);
 
-  // Centralized contest state calculations
   const getContestState = useCallback((): ButtonState => {
     const { hasStarted, hasEnded } = getTimeStatus();
     const isContestFull = contest.current_participants >= contest.max_participants;
 
-    // Contest has ended or is completed
-    if (hasEnded || contest.status === 'completed') {
+    if (hasEnded || contest.status === "completed") {
       return {
         text: "Completed",
         variant: "secondary",
         disabled: true,
         showProgress: false,
-        customClass: "bg-[#333333] hover:bg-[#333333] text-white"
+        customClass: "bg-[#333333] hover:bg-[#333333] text-white",
       };
     }
 
-    // My Contests view
     if (isInMyContests) {
       if (!hasStarted) {
         return {
@@ -79,29 +76,25 @@ export const ContestStatusButton = ({
           variant: "secondary",
           disabled: true,
           showProgress: false,
-          customClass: ""
+          customClass: "",
         };
       }
-
-      if (contest.status === 'in_progress' || (contest.status === 'upcoming' && hasStarted)) {
-        return {
-          text: "Start Contest",
-          variant: "default",
-          disabled: false,
-          showProgress: contest.status === 'in_progress',
-          customClass: ""
-        };
-      }
+      return {
+        text: "Start Contest",
+        variant: "default",
+        disabled: false,
+        showProgress: true,
+        customClass: "",
+      };
     }
 
-    // Available Contests view
     if (isContestFull) {
       return {
         text: "Contest Full",
         variant: "secondary",
         disabled: true,
-        showProgress: contest.status === 'in_progress',
-        customClass: ""
+        showProgress: contest.status === "in_progress",
+        customClass: "",
       };
     }
 
@@ -109,14 +102,13 @@ export const ContestStatusButton = ({
       text: "Join Contest",
       variant: "default",
       disabled: false,
-      showProgress: contest.status === 'in_progress',
-      customClass: ""
+      showProgress: contest.status === "in_progress",
+      customClass: "",
     };
-  }, [contest, isInMyContests]);
+  }, [contest, isInMyContests, getTimeStatus]);
 
-  // Progress bar management
   useEffect(() => {
-    if (contest.status !== 'in_progress') {
+    if (contest.status !== "in_progress") {
       setProgress(0);
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
@@ -128,20 +120,14 @@ export const ContestStatusButton = ({
     const updateProgress = () => {
       const { progress } = getTimeStatus();
       setProgress(progress);
-
       if (progress >= 100) {
-        if (intervalRef.current) {
-          clearInterval(intervalRef.current);
-          intervalRef.current = null;
-        }
+        clearInterval(intervalRef.current!);
+        intervalRef.current = null;
         queryClient.invalidateQueries({ queryKey: ["contest", contest.id] });
       }
     };
 
-    // Initial progress
     updateProgress();
-
-    // Set up interval for real-time updates
     if (!intervalRef.current) {
       intervalRef.current = setInterval(updateProgress, 1000);
     }
@@ -159,8 +145,8 @@ export const ContestStatusButton = ({
   return (
     <div className="relative w-full">
       <Button 
-        className={`w-full relative overflow-hidden ${buttonState.customClass} ${
-          buttonState.disabled && !buttonState.customClass ? 'bg-gray-300 hover:bg-gray-300' : ''
+        className={`w-full relative overflow-hidden transition-all duration-500 ${
+          buttonState.showProgress ? "bg-white" : "bg-green-500 hover:bg-green-600"
         }`}
         variant={buttonState.variant}
         disabled={disabled || buttonState.disabled}
@@ -174,20 +160,12 @@ export const ContestStatusButton = ({
         ) : (
           buttonState.text
         )}
-        
+
         {buttonState.showProgress && (
           <div 
-            className="absolute left-0 bottom-0 h-1 bg-primary/20"
-            style={{ width: '100%' }}
-          >
-            <div 
-              className="h-full bg-primary"
-              style={{ 
-                width: `${progress}%`,
-                transition: 'width 0.5s linear'
-              }}
-            />
-          </div>
+            className="absolute left-0 top-0 h-full bg-green-500 transition-all duration-500"
+            style={{ width: `${progress}%` }}
+          />
         )}
       </Button>
     </div>
