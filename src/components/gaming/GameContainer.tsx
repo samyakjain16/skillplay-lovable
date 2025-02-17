@@ -58,15 +58,35 @@ export const GameContainer = ({
     queryFn: async () => {
       console.log("Fetching leaderboard for contest:", contestId);
       const { data, error } = await supabase
-        .rpc('get_contest_leaderboard', { contest_id: contestId });
-      
+        .from('player_game_progress')
+        .select('user_id, score')
+        .eq('contest_id', contestId)
+        .order('score', { ascending: false });
+
       if (error) {
         console.error("Error fetching leaderboard:", error);
         throw error;
       }
-      
-      console.log("Leaderboard data:", data);
-      return data;
+
+      // Process the data to calculate ranks
+      const processedData = data.reduce((acc: any[], curr: any, index: number) => {
+        const existingEntry = acc.find(entry => entry.user_id === curr.user_id);
+        if (existingEntry) {
+          existingEntry.total_score += curr.score;
+        } else {
+          acc.push({
+            user_id: curr.user_id,
+            total_score: curr.score,
+            rank: index + 1
+          });
+        }
+        return acc;
+      }, []);
+
+      // Sort by total score and assign ranks
+      return processedData
+        .sort((a, b) => b.total_score - a.total_score)
+        .map((entry, index) => ({ ...entry, rank: index + 1 }));
     },
     enabled: !!contestId && isContestEnded
   });

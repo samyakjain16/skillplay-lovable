@@ -64,82 +64,41 @@ export const useGameProgress = ({
     if (!contest || !contestGames) return;
 
     const now = new Date();
-    const contestStart = new Date(contest.start_time);
     const contestEnd = new Date(contest.end_time);
 
     // Check if contest has ended
-    if (now > contestEnd) {
+    if (now > contestEnd || contest.status === 'completed') {
+      console.log("Contest ended condition met:", { now, contestEnd, status: contest.status });
       setIsContestEnded(true);
       setRemainingTime(0);
       return;
     }
 
-    // Calculate total elapsed time since contest start
-    const totalElapsedTime = Math.max(0, now.getTime() - contestStart.getTime()) / 1000;
-    
-    // Calculate which game we should be on based on elapsed time
-    const expectedGameIndex = Math.min(
-      Math.floor(totalElapsedTime / GAME_DURATION),
-      contestGames.length - 1
-    );
-
-    // Find next uncompleted game if current one is completed
-    let appropriateGameIndex = expectedGameIndex;
-    if (completedGames && completedGames.length > 0) {
-      while (
-        appropriateGameIndex < contestGames.length && 
-        completedGames.includes(contestGames[appropriateGameIndex].game_content_id)
-      ) {
-        appropriateGameIndex++;
-      }
-      if (appropriateGameIndex >= contestGames.length) {
-        appropriateGameIndex = contestGames.length - 1;
-      }
-    }
-
-    // If we don't have a game start time, calculate it based on contest progress
+    // If there's no game start time, calculate initial time
     if (!gameStartTime) {
-      // Calculate time into current game segment
-      const timeIntoCurrentGame = totalElapsedTime % GAME_DURATION;
-      const newRemainingTime = Math.max(0, GAME_DURATION - timeIntoCurrentGame);
-      setRemainingTime(newRemainingTime);
-      
-      // Calculate when this game segment started
-      const newStartTime = new Date(now.getTime() - (timeIntoCurrentGame * 1000));
-      
-      if (appropriateGameIndex !== currentGameIndex) {
-        setCurrentGameIndex(appropriateGameIndex);
-        setGameStartTime(newStartTime);
-
-        // Update progress in database
-        if (user) {
-          supabase
-            .from('user_contests')
-            .update({ 
-              current_game_index: appropriateGameIndex,
-              current_game_start_time: newStartTime.toISOString()
-            })
-            .eq('contest_id', contestId)
-            .eq('user_id', user.id)
-            .then(({ error }) => {
-              if (error) {
-                console.error('Error updating game progress:', error);
-                toast({
-                  variant: "destructive",
-                  title: "Error",
-                  description: "Failed to update game progress"
-                });
-              }
-            });
-        }
-      }
-    } else {
-      // Calculate remaining time based on game start time
-      const elapsed = (now.getTime() - gameStartTime.getTime()) / 1000;
-      const remaining = Math.max(0, GAME_DURATION - elapsed);
-      setRemainingTime(remaining);
+      setGameStartTime(new Date());
+      setRemainingTime(GAME_DURATION);
+      return;
     }
-  }, [contest, contestGames, currentGameIndex, gameStartTime, contestId, user, completedGames]);
+
+    // Calculate remaining time for current game
+    const elapsed = (now.getTime() - gameStartTime.getTime()) / 1000;
+    const remaining = Math.max(0, GAME_DURATION - elapsed);
+    setRemainingTime(remaining);
+
+    // Set up timer to update remaining time
+    const timer = setInterval(() => {
+      const newElapsed = (new Date().getTime() - gameStartTime.getTime()) / 1000;
+      const newRemaining = Math.max(0, GAME_DURATION - newElapsed);
+      setRemainingTime(newRemaining);
+
+      if (newRemaining <= 0) {
+        clearInterval(timer);
+      }
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [contest, contestGames, gameStartTime, GAME_DURATION, setGameStartTime]);
 
   return {
     remainingTime,
