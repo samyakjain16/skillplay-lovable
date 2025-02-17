@@ -36,7 +36,6 @@ export const ContestCard = ({ contest, onStart, isStarting, onJoin, isJoining, i
     const now = new Date();
     const startTime = new Date(contest.start_time);
     const endTime = new Date(contest.end_time);
-    const isFullyBooked = contest.current_participants >= contest.max_participants;
     
     // Don't allow any actions if the contest has ended
     if (now > endTime) {
@@ -48,13 +47,17 @@ export const ContestCard = ({ contest, onStart, isStarting, onJoin, isJoining, i
       return;
     }
 
-    // Check if the contest can be started
-    if (isFullyBooked && startTime <= now && contest.status === 'upcoming') {
-      if (onStart) {
+    // For My Contests
+    if (isInMyContests) {
+      if (now >= startTime && contest.status !== 'completed') {
         console.log('Starting contest:', contest.id);
-        onStart(contest.id);
+        onStart?.(contest.id);
       }
-    } else if (!isFullyBooked && onJoin) {
+      return;
+    }
+
+    // For Available Contests
+    if (!isInMyContests && onJoin && contest.current_participants < contest.max_participants) {
       onJoin(contest.id);
     }
   };
