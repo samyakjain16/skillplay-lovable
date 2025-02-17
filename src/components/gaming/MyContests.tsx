@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
@@ -36,29 +35,22 @@ export const MyContests = () => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  // Set up realtime subscription
+  // Set up real-time subscription
   useContestRealtime();
 
   const startContestMutation = useMutation({
     mutationFn: async (contestId: string) => {
-      console.log('Starting contest mutation for:', contestId);
-      
-      if (!user?.id) {
-        throw new Error('User not authenticated');
-      }
+      console.log("Starting contest for:", contestId);
 
-      // First update the contest status
+      if (!user?.id) throw new Error("User not authenticated");
+
       const { error: updateError } = await supabase
         .from("contests")
         .update({ status: "in_progress" })
         .eq("id", contestId);
 
-      if (updateError) {
-        console.error('Error updating contest status:', updateError);
-        throw updateError;
-      }
+      if (updateError) throw updateError;
 
-      // First check if user already has an entry
       const { data: existingEntry, error: fetchError } = await supabase
         .from("user_contests")
         .select("*")
@@ -66,45 +58,34 @@ export const MyContests = () => {
         .eq("user_id", user.id)
         .single();
 
-      if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 is "no rows returned"
-        console.error('Error fetching user contest:', fetchError);
-        throw fetchError;
-      }
+      if (fetchError && fetchError.code !== "PGRST116") throw fetchError;
 
-      // If entry exists, update it. If not, create new entry
       const { error: userContestError } = await supabase
         .from("user_contests")
-        .upsert({
-          id: existingEntry?.id, // This will be undefined for new entries
-          contest_id: contestId,
-          user_id: user.id,
-          status: 'active',
-          current_game_index: 0,
-          current_game_score: 0,
-          // Only set joined_at for new entries
-          ...((!existingEntry && { joined_at: new Date().toISOString() }))
-        }, {
-          onConflict: 'user_id,contest_id'
-        });
+        .upsert(
+          {
+            id: existingEntry?.id,
+            contest_id: contestId,
+            user_id: user.id,
+            status: "active",
+            current_game_index: 0,
+            current_game_score: 0,
+            ...(existingEntry ? {} : { joined_at: new Date().toISOString() }),
+          },
+          { onConflict: "user_id,contest_id" }
+        );
 
-      if (userContestError) {
-        console.error('Error updating user contest:', userContestError);
-        throw userContestError;
-      }
+      if (userContestError) throw userContestError;
 
       return contestId;
     },
     onSuccess: (contestId) => {
-      toast({
-        title: "Contest Started!",
-        description: "The contest has begun. Good luck!",
-      });
+      toast({ title: "Contest Started!", description: "Good luck!" });
       queryClient.invalidateQueries({ queryKey: ["my-contests"] });
-      // Navigate to the contest page
       navigate(`/contest/${contestId}`);
     },
     onError: (error: Error) => {
-      console.error('Start contest error:', error);
+      console.error("Start contest error:", error);
       toast({
         variant: "destructive",
         title: "Error",
@@ -116,52 +97,38 @@ export const MyContests = () => {
   const { data: contests, isLoading } = useQuery({
     queryKey: ["my-contests"],
     queryFn: async () => {
-      if (!user?.id) {
-        return [];
-      }
+      if (!user?.id) return [];
 
       const now = new Date();
 
-      // First update any contests that should be marked as completed
       const { error: updateError } = await supabase
         .from("contests")
         .update({ status: "completed" })
         .lt("end_time", now.toISOString())
         .neq("status", "completed");
 
-      if (updateError) {
-        console.error("Error updating contest statuses:", updateError);
-      }
+      if (updateError) console.error("Error updating contest statuses:", updateError);
 
-      // Then fetch the contests
       const { data, error } = await supabase
         .from("user_contests")
-        .select(`
-          *,
-          contest:contests(*)
-        `)
+        .select("*, contest:contests(*)")
         .eq("user_id", user?.id)
         .order("joined_at", { ascending: false });
 
       if (error) throw error;
 
-      // Update the status of contests that have ended
-      const updatedData = data.map((participation: Participation) => {
-        const endTime = new Date(participation.contest.end_time);
-        if (endTime < now && participation.contest.status !== 'completed') {
-          participation.contest.status = 'completed';
+      return data.map((participation: Participation) => {
+        if (new Date(participation.contest.end_time) < now) {
+          participation.contest.status = "completed";
         }
         return participation;
       });
-
-      return updatedData as Participation[];
     },
     enabled: !!user?.id,
+    staleTime: 60000, // Reduce unnecessary fetches
   });
 
-  if (isLoading) {
-    return <div>Loading your contests...</div>;
-  }
+  if (isLoading) return <div>Loading your contests...</div>;
 
   if (!contests || contests.length === 0) {
     return (
@@ -180,10 +147,7 @@ export const MyContests = () => {
         <ContestCard
           key={participation.id}
           contest={participation.contest}
-          onStart={(contestId) => {
-            console.log('Contest start requested:', contestId);
-            startContestMutation.mutate(contestId);
-          }}
+          onStart={(contestId) => startContestMutation.mutate(contestId)}
           isStarting={startContestMutation.isPending}
           isInMyContests={true}
         />

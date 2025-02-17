@@ -1,4 +1,3 @@
-
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,78 +11,32 @@ interface Contest {
   end_time: string;
 }
 
-interface MyContestParticipation {
-  id: string;
-  contest: Contest;
-}
-
-interface AvailableContest extends Contest {
-  description: string;
-  title: string;
-  prize_pool: number;
-  entry_fee: number;
-  max_participants: number;
-  prize_distribution_type: string;
-  series_count: number;
-}
-
 export const useContestRealtime = () => {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    // Enable REPLICA IDENTITY FULL for contests table to ensure complete row data
-    const channel = supabase
-      .channel('contest-changes')
-      .on(
-        'postgres_changes',
-        {
+    const channel = supabase.channel('contest-changes')
+      .on('postgres_changes', {
           event: '*',
           schema: 'public',
           table: 'contests'
         },
         (payload: RealtimePostgresChangesPayload<Contest>) => {
-          console.log('Received contest update:', payload);
           const newContest = payload.new as Contest;
           if (!newContest?.id) return;
 
-          // Update my-contests query data
-          queryClient.setQueryData<MyContestParticipation[] | undefined>(
-            ['my-contests'], 
-            (oldData) => {
-              if (!oldData) return oldData;
-              return oldData.map((participation) => {
-                if (participation.contest.id === newContest.id) {
-                  return {
-                    ...participation,
-                    contest: { ...participation.contest, ...newContest }
-                  };
-                }
-                return participation;
-              });
-            }
+          // Update global contest lists
+          queryClient.setQueryData(['my-contests'], (oldData: any) => 
+            oldData?.map((item: any) => item.id === newContest.id ? { ...item, ...newContest } : item)
           );
 
-          // Update available-contests query data
-          queryClient.setQueryData<AvailableContest[] | undefined>(
-            ['available-contests'], 
-            (oldData) => {
-              if (!oldData) return oldData;
-              return oldData.map((contest) => {
-                if (contest.id === newContest.id) {
-                  return { ...contest, ...newContest };
-                }
-                return contest;
-              });
-            }
+          queryClient.setQueryData(['available-contests'], (oldData: any) => 
+            oldData?.map((item: any) => item.id === newContest.id ? { ...item, ...newContest } : item)
           );
 
-          // Update single contest query if it exists
-          queryClient.setQueryData(
-            ['contest', newContest.id],
-            (oldData: any) => {
-              if (!oldData) return oldData;
-              return { ...oldData, ...newContest };
-            }
+          // Update individual contest details
+          queryClient.setQueryData(['contest', newContest.id], (oldData: any) => 
+            oldData ? { ...oldData, ...newContest } : oldData
           );
         }
       )

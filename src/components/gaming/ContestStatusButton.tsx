@@ -1,10 +1,11 @@
-
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { useEffect, useState, useCallback, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface ContestStatusButtonProps {
   contest: {
+    id: string;
     status: string;
     start_time: string;
     end_time: string;
@@ -20,6 +21,7 @@ interface ContestStatusButtonProps {
 export const ContestStatusButton = ({ contest, onClick, loading, disabled, isInMyContests }: ContestStatusButtonProps) => {
   const [progress, setProgress] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const queryClient = useQueryClient();
 
   const calculateProgress = useCallback(() => {
     const now = new Date();
@@ -55,6 +57,8 @@ export const ContestStatusButton = ({ contest, onClick, loading, disabled, isInM
             clearInterval(intervalRef.current);
             intervalRef.current = null;
           }
+          // Invalidate the query to fetch the latest contest status
+          queryClient.invalidateQueries({ queryKey: ["contest", contest.id] });
         }
       }, 1000);
     }
@@ -66,7 +70,7 @@ export const ContestStatusButton = ({ contest, onClick, loading, disabled, isInM
         intervalRef.current = null;
       }
     };
-  }, [contest.status, contest.start_time, contest.end_time, calculateProgress]);
+  }, [contest.status, contest.start_time, contest.end_time, calculateProgress, queryClient]);
 
   const now = new Date();
   const startTime = new Date(contest.start_time);
