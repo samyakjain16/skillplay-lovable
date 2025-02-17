@@ -50,7 +50,7 @@ export const Footer = () => {
               </a>
             </div>
             <div className="mt-4">
-              <p className="text-gray-600">mail: support@skillplay.com</p>
+              <p className="text-gray-600">Email: support@skillplay.com</p>
               <p className="text-gray-600">Phone: +1 (555) 123-4567</p>
             </div>
           </div>
