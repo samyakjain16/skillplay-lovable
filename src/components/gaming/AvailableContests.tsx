@@ -29,9 +29,9 @@ export const AvailableContests = () => {
   // Set up real-time subscription without passing any arguments
   useContestRealtime();
 
-  // Query to get user's joined contests
+  // Query to get user's joined contests with more frequent updates
   const { data: joinedContests } = useQuery({
-    queryKey: ["joined-contests"],
+    queryKey: ["joined-contests", user?.id],
     queryFn: async () => {
       if (!user) return [];
       const { data, error } = await supabase
@@ -42,7 +42,8 @@ export const AvailableContests = () => {
       if (error) throw error;
       return data.map(uc => uc.contest_id);
     },
-    enabled: !!user
+    enabled: !!user,
+    staleTime: 0, // Consider data always stale to force refresh
   });
 
   const { data: contests, isLoading } = useQuery({
@@ -64,13 +65,15 @@ export const AvailableContests = () => {
     return <div>Loading contests...</div>;
   }
 
-  // Filter contests based on our criteria
+  // Filter contests based on our criteria with explicit join check
   const availableContests = contests?.filter(contest => {
     const now = new Date();
     const startTime = new Date(contest.start_time);
     const endTime = new Date(contest.end_time);
-    const isJoined = joinedContests?.includes(contest.id);
+    const isJoined = joinedContests?.includes(contest.id) || false; // Explicit false if undefined
     const isFull = contest.current_participants >= contest.max_participants;
+    
+    console.log(`Contest ${contest.id} joined status:`, isJoined); // Debug log
     
     // Show contests that:
     // 1. Haven't been joined by the user
@@ -81,11 +84,11 @@ export const AvailableContests = () => {
            startTime > now && 
            !isFull && 
            endTime > now;
-  });
+  }) || [];
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {availableContests?.map((contest) => (
+      {availableContests.map((contest) => (
         <ContestCard
           key={contest.id}
           contest={contest}

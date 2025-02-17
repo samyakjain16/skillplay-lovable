@@ -46,13 +46,17 @@ export const useJoinContest = (user: User | null) => {
         description: "You have successfully joined the contest.",
       });
       
-      // Invalidate all relevant queries to update UI
+      // Invalidate queries in the correct order
+      queryClient.invalidateQueries({ queryKey: ["joined-contests"] });
       queryClient.invalidateQueries({ queryKey: ["available-contests"] });
       queryClient.invalidateQueries({ queryKey: ["my-contests"] });
       queryClient.invalidateQueries({ queryKey: ["profile"] });
       
-      // Force an immediate refetch of my-contests to ensure immediate UI update
-      queryClient.refetchQueries({ queryKey: ["my-contests"] });
+      // Force immediate refetch of critical queries
+      Promise.all([
+        queryClient.refetchQueries({ queryKey: ["joined-contests"] }),
+        queryClient.refetchQueries({ queryKey: ["my-contests"] })
+      ]);
     },
     onError: (error: Error) => {
       toast({
