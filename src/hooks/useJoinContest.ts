@@ -24,34 +24,7 @@ export const useJoinContest = (user: User | null) => {
     mutationFn: async (contestId: string) => {
       if (!user?.id) throw new Error("User not authenticated");
 
-      // First check if user has already joined
-      const { data: existingJoin } = await supabase
-        .from('user_contests')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('contest_id', contestId)
-        .maybeSingle();
-
-      if (existingJoin) {
-        throw new Error("You have already joined this contest");
-      }
-
-      // Check if contest is full
-      const { data: contest } = await supabase
-        .from('contests')
-        .select('current_participants, max_participants')
-        .eq('id', contestId)
-        .single();
-
-      if (!contest) {
-        throw new Error("Contest not found");
-      }
-
-      if (contest.current_participants >= contest.max_participants) {
-        throw new Error("Contest is full");
-      }
-
-      // If all checks pass, call the join_contest function
+      // Call the join_contest function directly - it handles all validation
       const { data, error } = await supabase.rpc<'join_contest', JoinContestFunction>(
         'join_contest',
         {
@@ -61,11 +34,16 @@ export const useJoinContest = (user: User | null) => {
       );
 
       if (error) {
-        // Handle specific error cases
-        if (error.message.includes('duplicate key')) {
+        console.error("Join contest error:", error);
+        // Handle specific error cases from the database function
+        if (error.message.includes('duplicate key') || error.message.includes('Already joined')) {
           throw new Error("You have already joined this contest");
+        } else if (error.message.includes('Contest is full')) {
+          throw new Error("Contest is full");
+        } else if (error.message.includes('Contest not found')) {
+          throw new Error("Contest not found");
         }
-        throw error;
+        throw new Error("Failed to join contest");
       }
       
       if (!data?.success) {
@@ -80,14 +58,14 @@ export const useJoinContest = (user: User | null) => {
         description: "You have successfully joined the contest.",
       });
       
-      // Invalidate and immediately refetch critical queries
+      // Invalidate all relevant queries first
       Promise.all([
         queryClient.invalidateQueries({ queryKey: ["joined-contests"] }),
         queryClient.invalidateQueries({ queryKey: ["available-contests"] }),
         queryClient.invalidateQueries({ queryKey: ["my-contests"] }),
         queryClient.invalidateQueries({ queryKey: ["profile"] })
       ]).then(() => {
-        // Force immediate refetch of critical queries
+        // Then force refetch of critical queries
         return Promise.all([
           queryClient.refetchQueries({ queryKey: ["joined-contests"] }),
           queryClient.refetchQueries({ queryKey: ["my-contests"] })
@@ -100,7 +78,7 @@ export const useJoinContest = (user: User | null) => {
         title: "Error",
         description: error.message,
       });
-      // Invalidate queries to ensure UI is in sync with server state
+      // Invalidate queries to ensure UI is in sync
       queryClient.invalidateQueries({ queryKey: ["available-contests"] });
       queryClient.invalidateQueries({ queryKey: ["my-contests"] });
     },
