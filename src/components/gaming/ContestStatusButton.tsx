@@ -144,35 +144,32 @@ export const ContestStatusButton = ({
 
   return (
     <div className="relative w-full">
-      <Button 
-        className={`w-full relative overflow-hidden transition-all duration-500 ${
-          buttonState.showProgress ? "bg-white" : "bg-green-500 hover:bg-green-600"
-        }`}
-        variant={buttonState.variant}
-        disabled={disabled || buttonState.disabled}
-        onClick={onClick}
-      >
-        {loading ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            {isInMyContests ? "Starting..." : "Joining..."}
-          </>
-        ) : (
-          buttonState.text
-        )}
+          <Button 
+      className={`w-full relative overflow-hidden transition-all duration-500 ${
+        buttonState.showProgress ? "bg-white" : "bg-green-500 hover:bg-green-600"
+      }`}
+      variant={buttonState.variant}
+      disabled={disabled || buttonState.disabled}
+      onClick={onClick}
+    >
+      {loading ? (
+        <>
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          {isInMyContests ? "Starting..." : "Joining..."}
+        </>
+      ) : buttonState.showProgress ? (
+        <>
+          <span className="relative z-10 text-black">Start Contest</span>
+          <div 
+            className="absolute left-0 top-0 h-full bg-green-500 transition-all duration-500"
+            style={{ width: `${progress}%` }}
+          />
+        </>
+      ) : (
+        buttonState.text
+      )}
+    </Button>
 
-        {buttonState.showProgress ? (
-          <>
-            <span className="relative z-10 text-black">Start Contest</span>
-            <div 
-              className="absolute left-0 top-0 h-full bg-green-500 transition-all duration-500"
-              style={{ width: `${progress}%` }}
-            />
-          </>
-        ) : (
-          buttonState.text
-        )}
-      </Button>
     </div>
   );
 };
