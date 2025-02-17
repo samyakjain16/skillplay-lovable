@@ -29,7 +29,7 @@ export const AvailableContests = () => {
   // Set up real-time subscription without passing any arguments
   useContestRealtime();
 
-  // Query to get user's joined contests with more frequent updates
+  // Query to get user's joined contests
   const { data: joinedContests } = useQuery({
     queryKey: ["joined-contests", user?.id],
     queryFn: async () => {
@@ -49,41 +49,38 @@ export const AvailableContests = () => {
   const { data: contests, isLoading } = useQuery({
     queryKey: ["available-contests"],
     queryFn: async () => {
+      const now = new Date().toISOString();
       const { data, error } = await supabase
         .from("contests")
         .select("*")
-        .eq("status", "upcoming")  // Only fetch upcoming contests
+        .eq("status", "upcoming")
+        .gt("start_time", now) // Only get contests that haven't started yet
         .order("start_time", { ascending: true });
 
       if (error) throw error;
       return data;
     },
-    refetchInterval: 10000, // Refetch every 10 seconds to check for status updates
+    refetchInterval: 10000, // Refetch every 10 seconds
   });
 
   if (isLoading) {
     return <div>Loading contests...</div>;
   }
 
-  // Filter contests based on our criteria with explicit join check
+  // Filter contests based on our criteria
   const availableContests = contests?.filter(contest => {
     const now = new Date();
     const startTime = new Date(contest.start_time);
-    const endTime = new Date(contest.end_time);
-    const isJoined = joinedContests?.includes(contest.id) || false; // Explicit false if undefined
+    const isJoined = joinedContests?.includes(contest.id) || false;
     const isFull = contest.current_participants >= contest.max_participants;
-    
-    console.log(`Contest ${contest.id} joined status:`, isJoined); // Debug log
     
     // Show contests that:
     // 1. Haven't been joined by the user
-    // 2. Haven't started yet
+    // 2. Haven't started yet (double check even though we filtered in the query)
     // 3. Aren't full
-    // 4. Haven't ended
     return !isJoined && 
            startTime > now && 
-           !isFull && 
-           endTime > now;
+           !isFull;
   }) || [];
 
   return (
