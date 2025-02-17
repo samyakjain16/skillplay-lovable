@@ -79,11 +79,9 @@ export const GameContainer = ({
           contest_id: contestId,
           game_content_id: currentGame.game_content_id
         })
-        .single();
+        .maybeSingle();
 
-      if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 is "not found" error
-        throw fetchError;
-      }
+      if (fetchError) throw fetchError;
 
       if (existingProgress) {
         toast({
@@ -143,16 +141,55 @@ export const GameContainer = ({
     }
   };
 
-  if (isLoading) return <p>Loading...</p>;
-  if (!contestGames || contestGames.length === 0) return <p>No games available</p>;
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!contestGames || contestGames.length === 0) {
+    return (
+      <div className="text-center py-8">
+        <p>No games available for this contest</p>
+      </div>
+    );
+  }
+
+  const currentGame = contestGames[currentGameIndex];
+  
+  if (!currentGame) {
+    return (
+      <div className="text-center py-8">
+        <p>Contest completed</p>
+      </div>
+    );
+  }
 
   return (
-    <div>
-      <h3>Game {currentGameIndex + 1} of {contestGames.length}</h3>
-      {gameStartTime && (
-        <CountdownTimer targetDate={new Date(gameStartTime.getTime() + remainingTime * 1000)} onEnd={() => handleGameEnd(0)} />
+    <Card className="p-6">
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="text-lg font-semibold">
+          Game {currentGameIndex + 1} of {contestGames.length}
+        </h3>
+        {gameStartTime && remainingTime > 0 && (
+          <div className="text-sm font-medium">
+            <CountdownTimer 
+              targetDate={new Date(gameStartTime.getTime() + (remainingTime * 1000))} 
+              onEnd={() => handleGameEnd(0)} 
+            />
+          </div>
+        )}
+      </div>
+
+      {completedGames?.includes(currentGame.game_content_id) ? (
+        <div className="flex items-center justify-center h-[300px]">
+          <p className="text-gray-500">This game has already been completed</p>
+        </div>
+      ) : (
+        <GameContent game={currentGame} onComplete={handleGameEnd} />
       )}
-      <button onClick={() => handleGameEnd(10)}>Submit Score</button>
-    </div>
+    </Card>
   );
 };
