@@ -76,7 +76,7 @@ export const ContestStatusButton = ({
           variant: "secondary",
           disabled: true,
           showProgress: false,
-          customClass: "",
+          customClass: "bg-gray-500 text-white",
         };
       }
       return {
@@ -145,8 +145,8 @@ export const ContestStatusButton = ({
   return (
     <div className="relative w-full">
           <Button 
-      className={`w-full relative overflow-hidden transition-all duration-500 ${
-        buttonState.showProgress ? "bg-white" : "bg-green-500 hover:bg-green-600"
+      className={`w-full relative overflow-hidden transition-all duration-500 ${buttonState.customClass} ${
+        buttonState.showProgress ? "bg-white" : "bg-green-300 hover:bg-green-600"
       }`}
       variant={buttonState.variant}
       disabled={disabled || buttonState.disabled}
