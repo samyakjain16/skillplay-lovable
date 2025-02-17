@@ -56,13 +56,19 @@ export const GameContainer = ({
   const { data: leaderboard, isLoading: leaderboardLoading } = useQuery({
     queryKey: ["contest-leaderboard", contestId],
     queryFn: async () => {
-      if (!isContestEnded) return null;
+      console.log("Fetching leaderboard for contest:", contestId);
       const { data, error } = await supabase
         .rpc('get_contest_leaderboard', { contest_id: contestId });
-      if (error) throw error;
+      
+      if (error) {
+        console.error("Error fetching leaderboard:", error);
+        throw error;
+      }
+      
+      console.log("Leaderboard data:", data);
       return data;
     },
-    enabled: isContestEnded
+    enabled: !!contestId && isContestEnded
   });
 
   // Update progress bar
@@ -172,9 +178,9 @@ export const GameContainer = ({
           ) : leaderboard && leaderboard.length > 0 ? (
             <div className="space-y-4">
               <div className="divide-y max-w-md mx-auto">
-                {leaderboard.map((entry: any) => (
+                {leaderboard.map((entry: any, index: number) => (
                   <div 
-                    key={entry.user_id} 
+                    key={`${entry.user_id}-${index}`}
                     className="py-3 flex justify-between items-center"
                   >
                     <span className="font-medium">#{entry.rank}</span>
@@ -185,7 +191,8 @@ export const GameContainer = ({
             </div>
           ) : (
             <div className="py-8">
-              <p>No results available yet. Please check back later.</p>
+              <p>No results available yet. The leaderboard is being calculated.</p>
+              <p className="text-sm text-muted-foreground mt-2">This may take a few moments.</p>
             </div>
           )}
         </div>
