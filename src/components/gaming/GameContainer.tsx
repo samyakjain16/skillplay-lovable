@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/components/ui/use-toast";
@@ -35,19 +35,21 @@ export const GameContainer = ({
   const [gameStartTime, setGameStartTime] = useState<Date | null>(
     initialProgress?.current_game_start_time ? new Date(initialProgress.current_game_start_time) : null
   );
+  const hasRedirected = useRef(false);
 
   const { data: completedGamesCount, refetch: refetchCompletedGames } = useGameProgress(contestId);
   const { contest, contestGames, isLoading } = useContestAndGames(contestId);
 
+  // Separate effect for contest end check
   useEffect(() => {
-    if (!contest || !contestGames || !user || contestGames.length === 0) return;
+    if (!contest || hasRedirected.current) return;
 
-    const checkContestTime = () => {
+    const checkContestEnd = () => {
       const now = new Date();
       const contestEnd = new Date(contest.end_time);
 
-      // Force navigate away if contest has ended
-      if (now > contestEnd) {
+      if (now > contestEnd && !hasRedirected.current) {
+        hasRedirected.current = true; // Prevent multiple redirects
         toast({
           title: "Contest Ended",
           description: "This contest has ended. Redirecting to leaderboard...",
@@ -58,22 +60,31 @@ export const GameContainer = ({
       return false;
     };
 
-    // Initial check
-    if (checkContestTime()) return;
+    const timeCheckInterval = setInterval(checkContestEnd, 1000);
 
-    // Set up interval to check contest end time
-    const timeCheckInterval = setInterval(checkContestTime, 1000);
+    return () => {
+      clearInterval(timeCheckInterval);
+    };
+  }, [contest, contestId, navigate, toast]);
+
+  // Main game logic effect
+  useEffect(() => {
+    if (!contest || !contestGames || !user || contestGames.length === 0 || hasRedirected.current) return;
 
     if (completedGamesCount && completedGamesCount >= contest.series_count) {
-      if (checkContestTime()) {
-        clearInterval(timeCheckInterval);
-        return;
+      const now = new Date();
+      const contestEnd = new Date(contest.end_time);
+      
+      if (now > contestEnd) {
+        hasRedirected.current = true;
+        navigate(`/contest/${contestId}/leaderboard`);
+      } else {
+        toast({
+          title: "Contest Still in Progress",
+          description: "You've completed all games. Check back when the contest ends to see the final results!",
+        });
+        navigate('/gaming');
       }
-      toast({
-        title: "Contest Still in Progress",
-        description: "You've completed all games. Check back when the contest ends to see the final results!",
-      });
-      navigate('/gaming');
       return;
     }
 
@@ -103,8 +114,6 @@ export const GameContainer = ({
           if (error) console.error('Error updating game progress:', error);
         });
     }
-
-    return () => clearInterval(timeCheckInterval);
   }, [contest, contestGames, user, contestId, gameStartTime, completedGamesCount, toast, navigate]);
 
   const getGameEndTime = (): Date | null => {
