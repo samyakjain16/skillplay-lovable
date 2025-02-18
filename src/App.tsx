@@ -11,7 +11,7 @@ import ContestLeaderboard from "./pages/ContestLeaderboard"; // Add this import
 import Sponsorships from "./pages/Sponsorships";
 import Wallet from "./pages/Wallet";
 import Auth from "./pages/Auth";
-import AuthCallback from "./pages/AuthCallbacks";
+import AuthCallback from "./pages/AuthCallback";
 import AccountSettings from "./pages/AccountSettings";
 
 const queryClient = new QueryClient();
