@@ -25,8 +25,7 @@ export const CountdownTimer = ({ targetDate, onEnd }: CountdownTimerProps) => {
         return null;
       }
 
-      // Calculate seconds only for game timer
-      const seconds = Math.floor(difference / 1000); // Changed from Math.ceil to Math.floor
+      const seconds = Math.floor(difference / 1000);
       return `${seconds}s`;
     };
 
@@ -51,3 +50,4 @@ export const CountdownTimer = ({ targetDate, onEnd }: CountdownTimerProps) => {
 
   return <span>{timeLeft}</span>;
 };
+

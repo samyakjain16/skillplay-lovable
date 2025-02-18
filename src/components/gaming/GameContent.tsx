@@ -4,6 +4,7 @@ import { CountdownTimer } from "./CountdownTimer";
 import { ArrangeSortGame } from "./games/ArrangeSortGame";
 import { TriviaGame } from "./games/TriviaGame";
 import { SpotDifferenceGame } from "./games/SpotDifferenceGame";
+import { useEffect } from "react";
 
 interface GameContentProps {
   currentGame: any;
@@ -20,6 +21,19 @@ export const GameContent = ({
   gameEndTime,
   onGameEnd
 }: GameContentProps) => {
+  // Effect to handle game end when component unmounts or game changes
+  useEffect(() => {
+    if (gameEndTime) {
+      const timeUntilEnd = new Date(gameEndTime).getTime() - new Date().getTime();
+      if (timeUntilEnd > 0) {
+        const timeout = setTimeout(() => {
+          onGameEnd(0);
+        }, timeUntilEnd);
+        return () => clearTimeout(timeout);
+      }
+    }
+  }, [gameEndTime, onGameEnd]);
+
   const renderGameContent = (game: any) => {
     switch (game.game_content.category) {
       case 'arrange_sort':
@@ -71,3 +85,4 @@ export const GameContent = ({
     </Card>
   );
 };
+
