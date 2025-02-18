@@ -9,6 +9,8 @@ import type { Database } from "@/integrations/supabase/types";
 import { ArrangeSortGame } from "./games/ArrangeSortGame";
 import { TriviaGame } from "./games/TriviaGame";
 import { SpotDifferenceGame } from "./games/SpotDifferenceGame";
+import { useToast } from "@/components/ui/use-toast";
+import { useNavigate } from "react-router-dom";
 
 type PlayerGameProgress = Database["public"]["Tables"]["player_game_progress"]["Insert"];
 
@@ -28,12 +30,29 @@ export const GameContainer = ({
   initialProgress 
 }: GameContainerProps) => {
   const { user } = useAuth();
+  const { toast } = useToast();
+  const navigate = useNavigate();
   const [currentGameIndex, setCurrentGameIndex] = useState(initialProgress?.current_game_index || 0);
   const [gameStartTime, setGameStartTime] = useState<Date | null>(
     initialProgress?.current_game_start_time ? new Date(initialProgress.current_game_start_time) : null
   );
 
-  // Fetch contest details including start_time and end_time
+  const { data: completedGamesCount } = useQuery({
+    queryKey: ["completed-games", contestId, user?.id],
+    queryFn: async () => {
+      if (!user) return 0;
+      const { count, error } = await supabase
+        .from("player_game_progress")
+        .select("*", { count: 'exact', head: true })
+        .eq("contest_id", contestId)
+        .eq("user_id", user.id)
+        .not("completed_at", "is", null);
+
+      if (error) throw error;
+      return count || 0;
+    },
+  });
+
   const { data: contest, isLoading: isLoadingContest } = useQuery({
     queryKey: ["contest", contestId],
     queryFn: async () => {
@@ -66,47 +85,49 @@ export const GameContainer = ({
   });
 
   useEffect(() => {
-    if (!contest || !contestGames || contestGames.length === 0) return;
+    if (!contest || !contestGames || !user || contestGames.length === 0) return;
+
+    if (completedGamesCount && completedGamesCount >= contest.series_count) {
+      toast({
+        title: "Contest Completed",
+        description: "You have completed all games in this contest.",
+      });
+      navigate(`/contest/${contestId}/leaderboard`);
+      return;
+    }
 
     const now = new Date();
     const contestStart = new Date(contest.start_time);
     const contestEnd = new Date(contest.end_time);
     const gameDuration = 30000; // 30 seconds in milliseconds
 
-    // If the contest hasn't started yet, wait
     if (now < contestStart) return;
 
-    // If the contest has ended, don't proceed
     if (now > contestEnd) return;
 
     const elapsedTime = now.getTime() - contestStart.getTime();
     const currentGameByTime = Math.floor(elapsedTime / gameDuration);
     const timeIntoCurrentGame = elapsedTime % gameDuration;
 
-    // If joining mid-contest or no game time is set
     if (!gameStartTime) {
-        // Calculate the actual start time by subtracting the time already elapsed in current game
-        const adjustedStartTime = new Date(now.getTime() - timeIntoCurrentGame);
-        
-        setCurrentGameIndex(currentGameByTime);
-        setGameStartTime(adjustedStartTime);
+      const adjustedStartTime = new Date(now.getTime() - timeIntoCurrentGame);
+      
+      setCurrentGameIndex(currentGameByTime);
+      setGameStartTime(adjustedStartTime);
 
-        // Update the progress in the database
-        if (user) {
-            supabase
-                .from('user_contests')
-                .update({ 
-                    current_game_index: currentGameByTime,
-                    current_game_start_time: adjustedStartTime.toISOString()
-                })
-                .eq('contest_id', contestId)
-                .eq('user_id', user.id)
-                .then(({ error }) => {
-                    if (error) console.error('Error updating game progress:', error);
-                });
-        }
+      supabase
+        .from('user_contests')
+        .update({ 
+          current_game_index: currentGameByTime,
+          current_game_start_time: adjustedStartTime.toISOString()
+        })
+        .eq('contest_id', contestId)
+        .eq('user_id', user.id)
+        .then(({ error }) => {
+          if (error) console.error('Error updating game progress:', error);
+        });
     }
-}, [contest, contestGames, user, contestId, gameStartTime]);
+  }, [contest, contestGames, user, contestId, gameStartTime, completedGamesCount, toast, navigate]);
 
   const getGameEndTime = (): Date | null => {
     if (!contest || !gameStartTime) return null;
@@ -123,48 +144,62 @@ export const GameContainer = ({
     const timeSpent = gameStartTime ? Math.floor((Date.now() - gameStartTime.getTime()) / 1000) : 30;
     const isFinalGame = currentGameIndex === contestGames.length - 1;
 
-    const progressData: PlayerGameProgress = {
-      user_id: user.id,
-      contest_id: contestId,
-      game_content_id: currentGame.game_content_id,
-      score: score,
-      time_taken: timeSpent,
-      started_at: gameStartTime?.toISOString(),
-      completed_at: new Date().toISOString(),
-      is_correct: score > 0
-    };
+    try {
+      const progressData: PlayerGameProgress = {
+        user_id: user.id,
+        contest_id: contestId,
+        game_content_id: currentGame.game_content_id,
+        score: score,
+        time_taken: timeSpent,
+        started_at: gameStartTime?.toISOString(),
+        completed_at: new Date().toISOString(),
+        is_correct: score > 0
+      };
 
-    // Record game progress
-    const { error: progressError } = await supabase
-      .from("player_game_progress")
-      .insert(progressData);
+      const { error: progressError } = await supabase
+        .from("player_game_progress")
+        .insert(progressData);
 
-    if (progressError) {
-      console.error("Error recording game progress:", progressError);
-      return;
-    }
+      if (progressError) {
+        console.error("Error recording game progress:", progressError);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to record game progress. Please try again.",
+        });
+        return;
+      }
 
-    // Update user_contests with current game progress
-    const { error: updateError } = await supabase
-      .from('user_contests')
-      .update({
-        current_game_index: isFinalGame ? currentGameIndex : currentGameIndex + 1,
-        current_game_score: score,
-        current_game_start_time: null
-      })
-      .eq('contest_id', contestId)
-      .eq('user_id', user.id);
+      const { error: updateError } = await supabase
+        .from('user_contests')
+        .update({
+          current_game_index: isFinalGame ? currentGameIndex : currentGameIndex + 1,
+          current_game_score: score,
+          current_game_start_time: null,
+          status: isFinalGame ? 'completed' : 'active',
+        })
+        .eq('contest_id', contestId)
+        .eq('user_id', user.id);
 
-    if (updateError) {
-      console.error("Error updating contest progress:", updateError);
-      return;
-    }
+      if (updateError) {
+        console.error("Error updating contest progress:", updateError);
+        return;
+      }
 
-    onGameComplete(score, isFinalGame);
-    
-    if (!isFinalGame) {
-      setCurrentGameIndex(prev => prev + 1);
-      setGameStartTime(new Date());
+      onGameComplete(score, isFinalGame);
+      
+      if (!isFinalGame) {
+        setCurrentGameIndex(prev => prev + 1);
+        setGameStartTime(new Date());
+      }
+
+    } catch (error) {
+      console.error("Error in handleGameEnd:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "An error occurred while saving your progress.",
+      });
     }
   };
 
