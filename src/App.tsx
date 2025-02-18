@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -7,11 +8,11 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Gaming from "./pages/Gaming";
 import Contest from "./pages/Contest";
-import ContestLeaderboard from "./pages/ContestLeaderboard"; // Add this import
+import ContestLeaderboard from "./pages/ContestLeaderboard";
 import Sponsorships from "./pages/Sponsorships";
 import Wallet from "./pages/Wallet";
 import Auth from "./pages/Auth";
-import AuthCallback from "./pages/AuthCallback";
+import AuthCallback from "./pages/AuthCallback"; // Fixed import name here
 import AccountSettings from "./pages/AccountSettings";
 
 const queryClient = new QueryClient();
@@ -26,7 +27,7 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/gaming" element={<Gaming />} />
           <Route path="/contest/:id" element={<Contest />} />
-          <Route path="/contest/:id/leaderboard" element={<ContestLeaderboard />} /> {/* Add this route */}
+          <Route path="/contest/:id/leaderboard" element={<ContestLeaderboard />} />
           <Route path="/sponsorships" element={<Sponsorships />} />
           <Route path="/wallet" element={<Wallet />} />
           <Route path="/auth" element={<Auth />} />
