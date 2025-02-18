@@ -239,6 +239,7 @@ export type Database = {
       }
       user_contests: {
         Row: {
+          completed_at: string | null
           contest_id: string
           current_game_index: number | null
           current_game_score: number | null
@@ -250,6 +251,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          completed_at?: string | null
           contest_id: string
           current_game_index?: number | null
           current_game_score?: number | null
@@ -261,6 +263,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          completed_at?: string | null
           contest_id?: string
           current_game_index?: number | null
           current_game_score?: number | null
