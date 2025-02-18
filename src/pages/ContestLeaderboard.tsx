@@ -53,15 +53,6 @@ const ContestLeaderboard = () => {
       
       <main className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">
-          <Button
-            variant="ghost"
-            onClick={() => navigate('/gaming')}
-            className="mb-4"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Gaming
-          </Button>
-
           <h1 className="text-3xl font-bold mb-2">
             Contest Leaderboard
           </h1>
@@ -111,6 +102,15 @@ const ContestLeaderboard = () => {
               </div>
             </div>
           )}
+          
+          <div className="mt-8 flex justify-center">
+            <Button
+              onClick={() => navigate('/gaming')}
+              className="w-full max-w-md"
+            >
+              Return to Gaming
+            </Button>
+          </div>
         </div>
       </main>
     </div>
