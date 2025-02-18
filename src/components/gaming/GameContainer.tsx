@@ -1,18 +1,15 @@
 
 import { useEffect, useState } from "react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { CountdownTimer } from "./CountdownTimer";
-import type { Database } from "@/integrations/supabase/types";
-import { ArrangeSortGame } from "./games/ArrangeSortGame";
-import { TriviaGame } from "./games/TriviaGame";
-import { SpotDifferenceGame } from "./games/SpotDifferenceGame";
 import { useToast } from "@/components/ui/use-toast";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useGameProgress } from "./hooks/useGameProgress";
+import { useContestAndGames } from "./hooks/useContestAndGames";
+import { GameProgress } from "./GameProgress";
+import { GameContent } from "./GameContent";
+import type { Database } from "@/integrations/supabase/types";
 
 type PlayerGameProgress = Database["public"]["Tables"]["player_game_progress"]["Insert"];
 
@@ -39,76 +36,8 @@ export const GameContainer = ({
     initialProgress?.current_game_start_time ? new Date(initialProgress.current_game_start_time) : null
   );
 
-  // Check if user has completed all games
-  const { data: completedGamesCount, refetch: refetchCompletedGames } = useQuery({
-    queryKey: ["completed-games", contestId, user?.id],
-    queryFn: async () => {
-      if (!user) return 0;
-      const { count, error } = await supabase
-        .from("player_game_progress")
-        .select("*", { count: 'exact', head: true })
-        .eq("contest_id", contestId)
-        .eq("user_id", user.id)
-        .not("completed_at", "is", null);
-
-      if (error) throw error;
-      return count || 0;
-    },
-  });
-
-  const { data: contest, isLoading: isLoadingContest } = useQuery({
-    queryKey: ["contest", contestId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("contests")
-        .select("*")
-        .eq("id", contestId)
-        .single();
-
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const { data: contestGames, isLoading: isLoadingGames } = useQuery({
-    queryKey: ["contest-games", contestId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("contest_games")
-        .select(`
-          *,
-          game_content (*)
-        `)
-        .eq("contest_id", contestId)
-        .order("sequence_number");
-
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  // Check if current game has already been completed
-  const { data: currentGameProgress } = useQuery({
-    queryKey: ["game-progress", contestId, user?.id, currentGameIndex],
-    queryFn: async () => {
-      if (!user || !contestGames) return null;
-      const currentGame = contestGames[currentGameIndex];
-      if (!currentGame) return null;
-
-      const { data, error } = await supabase
-        .from("player_game_progress")
-        .select("*")
-        .eq("contest_id", contestId)
-        .eq("user_id", user.id)
-        .eq("game_content_id", currentGame.game_content_id)
-        .not("completed_at", "is", null)
-        .maybeSingle();
-
-      if (error && error.code !== "PGRST116") throw error;
-      return data;
-    },
-    enabled: !!user && !!contestGames && !!contestGames[currentGameIndex],
-  });
+  const { data: completedGamesCount, refetch: refetchCompletedGames } = useGameProgress(contestId);
+  const { contest, contestGames, isLoading } = useContestAndGames(contestId);
 
   useEffect(() => {
     if (!contest || !contestGames || !user || contestGames.length === 0) return;
@@ -116,7 +45,6 @@ export const GameContainer = ({
     const now = new Date();
     const contestEnd = new Date(contest.end_time);
 
-    // If user has completed all games, show appropriate message based on contest status
     if (completedGamesCount && completedGamesCount >= contest.series_count) {
       if (now > contestEnd) {
         navigate(`/contest/${contestId}/leaderboard`);
@@ -130,23 +58,15 @@ export const GameContainer = ({
       return;
     }
 
-    // If current game is already completed, move to next game
-    if (currentGameProgress && currentGameIndex < contestGames.length - 1) {
-      setCurrentGameIndex(prev => prev + 1);
-      setGameStartTime(new Date());
-      return;
-    }
-
     const contestStart = new Date(contest.start_time);
     if (now < contestStart) return;
     if (now > contestEnd) return;
 
-    const elapsedTime = now.getTime() - contestStart.getTime();
-    const gameDuration = 30000; // 30 seconds in milliseconds
-    const currentGameByTime = Math.floor(elapsedTime / gameDuration);
-    const timeIntoCurrentGame = elapsedTime % gameDuration;
-
     if (!gameStartTime) {
+      const elapsedTime = now.getTime() - contestStart.getTime();
+      const gameDuration = 30000; // 30 seconds in milliseconds
+      const currentGameByTime = Math.floor(elapsedTime / gameDuration);
+      const timeIntoCurrentGame = elapsedTime % gameDuration;
       const adjustedStartTime = new Date(now.getTime() - timeIntoCurrentGame);
       
       setCurrentGameIndex(currentGameByTime);
@@ -164,7 +84,7 @@ export const GameContainer = ({
           if (error) console.error('Error updating game progress:', error);
         });
     }
-  }, [contest, contestGames, user, contestId, gameStartTime, completedGamesCount, currentGameProgress, currentGameIndex, toast, navigate]);
+  }, [contest, contestGames, user, contestId, gameStartTime, completedGamesCount, toast, navigate]);
 
   const getGameEndTime = (): Date | null => {
     if (!contest || !gameStartTime) return null;
@@ -258,39 +178,7 @@ export const GameContainer = ({
     }
   };
 
-  const renderGameContent = (game: any) => {
-    switch (game.game_content.category) {
-      case 'arrange_sort':
-        return (
-          <ArrangeSortGame
-            content={game.game_content.content}
-            onComplete={handleGameEnd}
-          />
-        );
-      case 'trivia':
-        return (
-          <TriviaGame
-            content={game.game_content.content}
-            onComplete={handleGameEnd}
-          />
-        );
-      case 'spot_difference':
-        return (
-          <SpotDifferenceGame
-            content={game.game_content.content}
-            onComplete={handleGameEnd}
-          />
-        );
-      default:
-        return (
-          <div className="text-center py-8">
-            <p>Unsupported game type</p>
-          </div>
-        );
-    }
-  };
-
-  if (isLoadingContest || isLoadingGames) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -306,58 +194,24 @@ export const GameContainer = ({
     );
   }
 
-  // Show appropriate message for completed contests
   if (completedGamesCount && contest && completedGamesCount >= contest.series_count) {
     const now = new Date();
     const contestEnd = new Date(contest.end_time);
     const isContestFinished = now > contestEnd;
 
-    return (
-      <Card className="p-6">
-        <div className="text-center py-8">
-          <h3 className="text-xl font-semibold mb-4">Contest Progress</h3>
-          {isContestFinished ? (
-            <>
-              <p className="text-muted-foreground mb-6">Contest has ended. View the final results!</p>
-              <Button onClick={() => navigate(`/contest/${contestId}/leaderboard`)}>
-                View Leaderboard
-              </Button>
-            </>
-          ) : (
-            <>
-              <p className="text-muted-foreground mb-6">
-                You've completed all games! The contest is still in progress.
-                Check back when it ends to see the final results.
-              </p>
-              <Button onClick={() => navigate('/gaming')}>
-                Return to Gaming
-              </Button>
-            </>
-          )}
-        </div>
-      </Card>
-    );
+    return <GameProgress contestId={contestId} isContestFinished={isContestFinished} />;
   }
 
   const currentGame = contestGames[currentGameIndex];
   const gameEndTime = getGameEndTime();
 
   return (
-    <Card className="p-6">
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-semibold">
-          Game {currentGameIndex + 1} of {contestGames.length}
-        </h3>
-        {gameEndTime && (
-          <div className="text-sm font-medium">
-            Time Remaining: <CountdownTimer targetDate={gameEndTime} onEnd={() => handleGameEnd(0)} />
-          </div>
-        )}
-      </div>
-
-      <div className="min-h-[300px]">
-        {renderGameContent(currentGame)}
-      </div>
-    </Card>
+    <GameContent 
+      currentGame={currentGame}
+      currentGameIndex={currentGameIndex}
+      totalGames={contestGames.length}
+      gameEndTime={gameEndTime}
+      onGameEnd={handleGameEnd}
+    />
   );
 };
