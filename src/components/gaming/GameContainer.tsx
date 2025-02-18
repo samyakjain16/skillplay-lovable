@@ -42,25 +42,44 @@ export const GameContainer = ({
   useEffect(() => {
     if (!contest || !contestGames || !user || contestGames.length === 0) return;
 
-    const now = new Date();
-    const contestEnd = new Date(contest.end_time);
+    const checkContestTime = () => {
+      const now = new Date();
+      const contestEnd = new Date(contest.end_time);
+
+      // Force navigate away if contest has ended
+      if (now > contestEnd) {
+        toast({
+          title: "Contest Ended",
+          description: "This contest has ended. Redirecting to leaderboard...",
+        });
+        navigate(`/contest/${contestId}/leaderboard`);
+        return true;
+      }
+      return false;
+    };
+
+    // Initial check
+    if (checkContestTime()) return;
+
+    // Set up interval to check contest end time
+    const timeCheckInterval = setInterval(checkContestTime, 1000);
 
     if (completedGamesCount && completedGamesCount >= contest.series_count) {
-      if (now > contestEnd) {
-        navigate(`/contest/${contestId}/leaderboard`);
-      } else {
-        toast({
-          title: "Contest Still in Progress",
-          description: "You've completed all games. Check back when the contest ends to see the final results!",
-        });
-        navigate('/gaming');
+      if (checkContestTime()) {
+        clearInterval(timeCheckInterval);
+        return;
       }
+      toast({
+        title: "Contest Still in Progress",
+        description: "You've completed all games. Check back when the contest ends to see the final results!",
+      });
+      navigate('/gaming');
       return;
     }
 
     const contestStart = new Date(contest.start_time);
+    const now = new Date();
     if (now < contestStart) return;
-    if (now > contestEnd) return;
 
     if (!gameStartTime) {
       const elapsedTime = now.getTime() - contestStart.getTime();
@@ -84,6 +103,8 @@ export const GameContainer = ({
           if (error) console.error('Error updating game progress:', error);
         });
     }
+
+    return () => clearInterval(timeCheckInterval);
   }, [contest, contestGames, user, contestId, gameStartTime, completedGamesCount, toast, navigate]);
 
   const getGameEndTime = (): Date | null => {

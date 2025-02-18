@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 
 interface CountdownTimerProps {
@@ -25,7 +26,7 @@ export const CountdownTimer = ({ targetDate, onEnd }: CountdownTimerProps) => {
       }
 
       // Calculate seconds only for game timer
-      const seconds = Math.ceil(difference / 1000);
+      const seconds = Math.floor(difference / 1000); // Changed from Math.ceil to Math.floor
       return `${seconds}s`;
     };
 
