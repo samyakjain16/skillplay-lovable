@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -136,19 +137,25 @@ export const GameContainer = ({
       return;
     }
 
-    const nextGameStart = new Date(contest.start_time.getTime() + (currentGameIndex + 1) * 30000);
-    const timeIntoCurrentGame = now.getTime() - nextGameStart.getTime();
+    const contestStart = new Date(contest.start_time);
+    if (now < contestStart) return;
+    if (now > contestEnd) return;
+
+    const elapsedTime = now.getTime() - contestStart.getTime();
+    const gameDuration = 30000; // 30 seconds in milliseconds
+    const currentGameByTime = Math.floor(elapsedTime / gameDuration);
+    const timeIntoCurrentGame = elapsedTime % gameDuration;
 
     if (!gameStartTime) {
       const adjustedStartTime = new Date(now.getTime() - timeIntoCurrentGame);
       
-      setCurrentGameIndex(currentGameIndex);
+      setCurrentGameIndex(currentGameByTime);
       setGameStartTime(adjustedStartTime);
 
       supabase
         .from('user_contests')
         .update({ 
-          current_game_index: currentGameIndex,
+          current_game_index: currentGameByTime,
           current_game_start_time: adjustedStartTime.toISOString()
         })
         .eq('contest_id', contestId)
@@ -161,7 +168,6 @@ export const GameContainer = ({
 
   const getGameEndTime = (): Date | null => {
     if (!contest || !gameStartTime) return null;
-
     const contestStart = new Date(contest.start_time);
     const nextGameStart = new Date(contestStart.getTime() + (currentGameIndex + 1) * 30000);
     return nextGameStart;
