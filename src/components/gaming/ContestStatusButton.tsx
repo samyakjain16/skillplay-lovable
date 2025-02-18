@@ -17,7 +17,7 @@ interface ContestStatusButtonProps {
   loading?: boolean;
   isInMyContests?: boolean;
   userCompletedGames?: boolean;  // Add this line
-
+}
 
 type ButtonState = {
   text: string;
