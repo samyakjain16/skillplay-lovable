@@ -9,32 +9,34 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Wallet, Bell, Shield, ChevronLeft, User, CreditCard, History, HelpCircle, LogOut } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { GameStats } from "@/components/account/GameStats";
+import { Achievements } from "@/components/account/Achievements";
+
 const AccountSettings = () => {
   const navigate = useNavigate();
-  const {
-    user,
-    signOut
-  } = useAuth();
-  const {
-    data: profile
-  } = useQuery({
+  const { user, signOut } = useAuth();
+
+  const { data: profile } = useQuery({
     queryKey: ["profile"],
     queryFn: async () => {
       if (!user) return null;
-      const {
-        data,
-        error
-      } = await supabase.from("profiles").select("*").eq("id", user.id).single();
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .single();
       if (error) throw error;
       return data;
     },
     enabled: !!user
   });
-  return <AuthGuard>
+
+  return (
+    <AuthGuard>
       <div className="min-h-screen bg-gray-50">
         <Navigation />
         <main className="container mx-auto px-4 py-8 pt-24">
-          <div className="max-w-2xl mx-auto">
+          <div className="max-w-4xl mx-auto">
             <div className="flex items-center gap-4 mb-6">
               <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
                 <ChevronLeft className="h-6 w-6" />
@@ -42,7 +44,13 @@ const AccountSettings = () => {
               <h1 className="text-2xl font-bold">Account Settings</h1>
             </div>
 
-            <div className="space-y-6">
+            <div className="grid gap-6">
+              {/* Game Stats Section */}
+              <GameStats />
+
+              {/* Achievements Section */}
+              <Achievements />
+
               {/* Profile Section */}
               <Card>
                 <CardHeader>
@@ -163,12 +171,21 @@ const AccountSettings = () => {
                 </CardContent>
               </Card>
 
-              {/* Sign Out */}
-              
+              {/* Sign Out Button */}
+              <Button 
+                variant="destructive" 
+                className="w-full"
+                onClick={() => signOut()}
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                Sign Out
+              </Button>
             </div>
           </div>
         </main>
       </div>
-    </AuthGuard>;
+    </AuthGuard>
+  );
 };
+
 export default AccountSettings;
