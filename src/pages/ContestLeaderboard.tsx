@@ -5,7 +5,6 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
 
 const ContestLeaderboard = () => {
   const { id } = useParams();
@@ -19,7 +18,6 @@ const ContestLeaderboard = () => {
         .select(`
           user_id,
           score,
-          status,
           profiles:user_id (
             username,
             avatar_url
@@ -73,7 +71,6 @@ const ContestLeaderboard = () => {
                       <th className="text-left py-2">Rank</th>
                       <th className="text-left py-2">Player</th>
                       <th className="text-right py-2">Score</th>
-                      <th className="text-right py-2">Status</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -85,15 +82,6 @@ const ContestLeaderboard = () => {
                         </td>
                         <td className="py-4 text-right">
                           {entry.score.toLocaleString()}
-                        </td>
-                        <td className="py-4 text-right">
-                          <span className={`inline-block px-2 py-1 rounded text-sm ${
-                            entry.status === 'completed' 
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-yellow-100 text-yellow-800'
-                          }`}>
-                            {entry.status === 'completed' ? 'Completed' : 'In Progress'}
-                          </span>
                         </td>
                       </tr>
                     ))}
