@@ -1,4 +1,3 @@
-
 import { Card, CardContent } from "@/components/ui/card";
 import { ContestDetails } from "./ContestCard/ContestDetails";
 import { ContestStatusButton } from "./ContestStatusButton";
@@ -48,44 +47,103 @@ export const ContestCard = ({
     const startTime = new Date(contest.start_time);
     const endTime = new Date(contest.end_time);
     
-    // Handle completed contests
+    // If contest is completed, navigate to leaderboard
+    if (contest.status === 'completed') {
+      navigate(`/contest/${contest.id}/leaderboard`);
+      return;
+    }
+
+    // If contest has ended by time
     if (now > endTime) {
-      navigate(`/contest/${contest.id}`);
+      navigate(`/contest/${contest.id}/leaderboard`);
       return;
     }
 
-    // Handle in-progress contests where user has completed their games
-    if (userCompletedGames && now < endTime) {
-      toast({
-        title: "Contest Still in Progress",
-        description: "Please wait for the contest to end to see final results.",
-      });
-      return;
-    }
-
-    // For My Contests
+    // For contests in "My Contests"
     if (isInMyContests) {
-      if (now >= startTime && contest.status !== 'completed') {
-        onStart?.(contest.id);
+      // Contest hasn't started yet
+      if (now < startTime) {
+        toast({
+          title: "Contest Not Started",
+          description: `Contest will begin at ${startTime.toLocaleTimeString()} on ${startTime.toLocaleDateString()}`,
+        });
+        return;
       }
-      return;
+
+      // User has completed all games but contest is still running
+      if (userCompletedGames) {
+        toast({
+          title: "Games Completed",
+          description: "You've completed all games. Leaderboard will be available when the contest ends.",
+        });
+        return;
+      }
+
+      // Contest is active and user hasn't completed games
+      if (now >= startTime && now <= endTime && !userCompletedGames) {
+        onStart?.(contest.id);
+        return;
+      }
     }
 
-    // For Available Contests
-    if (!isInMyContests && onJoin && contest.current_participants < contest.max_participants) {
-      onJoin(contest.id);
+    // For contests in "Available Contests"
+    if (!isInMyContests) {
+      // Check if contest is full
+      if (contest.current_participants >= contest.max_participants) {
+        toast({
+          variant: "destructive",
+          title: "Contest Full",
+          description: "This contest has reached its maximum number of participants.",
+        });
+        return;
+      }
+
+      // Contest hasn't started yet - allow joining
+      if (now < startTime) {
+        onJoin?.(contest.id);
+        return;
+      }
+
+      // Contest is in progress - check if enough time to participate
+      if (now >= startTime && now <= endTime) {
+        const remainingTime = endTime.getTime() - now.getTime();
+        const minimumTimeRequired = contest.series_count * 30000; // series_count * 30 seconds per game
+
+        if (remainingTime < minimumTimeRequired) {
+          toast({
+            variant: "destructive",
+            title: "Contest Ending Soon",
+            description: `Not enough time left to complete ${contest.series_count} games.`,
+          });
+          return;
+        }
+
+        onJoin?.(contest.id);
+        return;
+      }
     }
   };
   
   return (
     <Card 
-      className="w-full transition-all duration-200 hover:shadow-lg cursor-pointer"
+      className={`w-full transition-all duration-200 hover:shadow-lg ${
+        contest.status === 'completed' || new Date() > new Date(contest.end_time)
+          ? 'cursor-pointer opacity-75'
+          : (isStarting || isJoining) 
+            ? 'cursor-wait' 
+            : 'cursor-pointer'
+      }`}
       onClick={handleContestAction}
     >
       <CardContent className="p-6">
         <div className="space-y-4">
           <div>
             <h3 className="text-lg font-semibold">{contest.title}</h3>
+            {contest.status === 'completed' && (
+              <span className="text-sm text-muted-foreground">
+                Contest completed - View leaderboard
+              </span>
+            )}
           </div>
 
           <ContestDetails
