@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
@@ -37,7 +38,8 @@ export const GameContainer = ({
     initialProgress?.current_game_start_time ? new Date(initialProgress.current_game_start_time) : null
   );
 
-  const { data: completedGamesCount } = useQuery({
+  // Check if user has completed all games
+  const { data: completedGamesCount, refetch: refetchCompletedGames } = useQuery({
     queryKey: ["completed-games", contestId, user?.id],
     queryFn: async () => {
       if (!user) return 0;
@@ -84,9 +86,33 @@ export const GameContainer = ({
     },
   });
 
+  // Check if current game has already been completed
+  const { data: currentGameProgress } = useQuery({
+    queryKey: ["game-progress", contestId, user?.id, currentGameIndex],
+    queryFn: async () => {
+      if (!user || !contestGames) return null;
+      const currentGame = contestGames[currentGameIndex];
+      if (!currentGame) return null;
+
+      const { data, error } = await supabase
+        .from("player_game_progress")
+        .select("*")
+        .eq("contest_id", contestId)
+        .eq("user_id", user.id)
+        .eq("game_content_id", currentGame.game_content_id)
+        .not("completed_at", "is", null)
+        .single();
+
+      if (error && error.code !== "PGRST116") throw error; // PGRST116 is "no rows returned"
+      return data;
+    },
+    enabled: !!user && !!contestGames,
+  });
+
   useEffect(() => {
     if (!contest || !contestGames || !user || contestGames.length === 0) return;
 
+    // If user has completed all games, redirect to leaderboard
     if (completedGamesCount && completedGamesCount >= contest.series_count) {
       toast({
         title: "Contest Completed",
@@ -96,13 +122,19 @@ export const GameContainer = ({
       return;
     }
 
+    // If current game is already completed, move to next game
+    if (currentGameProgress && currentGameIndex < contestGames.length - 1) {
+      setCurrentGameIndex(prev => prev + 1);
+      setGameStartTime(new Date());
+      return;
+    }
+
     const now = new Date();
     const contestStart = new Date(contest.start_time);
     const contestEnd = new Date(contest.end_time);
     const gameDuration = 30000; // 30 seconds in milliseconds
 
     if (now < contestStart) return;
-
     if (now > contestEnd) return;
 
     const elapsedTime = now.getTime() - contestStart.getTime();
@@ -127,7 +159,7 @@ export const GameContainer = ({
           if (error) console.error('Error updating game progress:', error);
         });
     }
-  }, [contest, contestGames, user, contestId, gameStartTime, completedGamesCount, toast, navigate]);
+  }, [contest, contestGames, user, contestId, gameStartTime, completedGamesCount, currentGameProgress, currentGameIndex, toast, navigate]);
 
   const getGameEndTime = (): Date | null => {
     if (!contest || !gameStartTime) return null;
@@ -145,6 +177,25 @@ export const GameContainer = ({
     const isFinalGame = currentGameIndex === contestGames.length - 1;
 
     try {
+      // Check if game has already been completed
+      const { data: existingProgress } = await supabase
+        .from("player_game_progress")
+        .select("*")
+        .eq("contest_id", contestId)
+        .eq("user_id", user.id)
+        .eq("game_content_id", currentGame.game_content_id)
+        .not("completed_at", "is", null)
+        .single();
+
+      if (existingProgress) {
+        console.log("Game already completed, moving to next game");
+        if (!isFinalGame) {
+          setCurrentGameIndex(prev => prev + 1);
+          setGameStartTime(new Date());
+        }
+        return;
+      }
+
       const progressData: PlayerGameProgress = {
         user_id: user.id,
         contest_id: contestId,
@@ -162,6 +213,10 @@ export const GameContainer = ({
 
       if (progressError) {
         console.error("Error recording game progress:", progressError);
+        if (progressError.code === '23505') { // Unique violation
+          console.log("Game already completed, skipping progress update");
+          return;
+        }
         toast({
           variant: "destructive",
           title: "Error",
@@ -186,6 +241,9 @@ export const GameContainer = ({
         return;
       }
 
+      // Refetch completed games count to trigger redirect if needed
+      await refetchCompletedGames();
+      
       onGameComplete(score, isFinalGame);
       
       if (!isFinalGame) {
@@ -248,6 +306,21 @@ export const GameContainer = ({
       <div className="text-center py-8">
         <p>No games available for this contest</p>
       </div>
+    );
+  }
+
+  // If all games are completed, show completion message
+  if (completedGamesCount && contest && completedGamesCount >= contest.series_count) {
+    return (
+      <Card className="p-6">
+        <div className="text-center py-8">
+          <h3 className="text-xl font-semibold mb-4">Contest Completed!</h3>
+          <p className="text-muted-foreground mb-6">You have completed all games in this contest.</p>
+          <Button onClick={() => navigate(`/contest/${contestId}/leaderboard`)}>
+            View Leaderboard
+          </Button>
+        </div>
+      </Card>
     );
   }
 
