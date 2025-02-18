@@ -179,6 +179,7 @@ export const GameContainer = ({
     const currentGame = contestGames[currentGameIndex];
     const timeSpent = gameStartTime ? Math.floor((Date.now() - gameStartTime.getTime()) / 1000) : 30;
     const isFinalGame = currentGameIndex === contestGames.length - 1;
+    const now = new Date().toISOString();
 
     try {
       // First, update user_contests to mark current game progress
@@ -189,6 +190,7 @@ export const GameContainer = ({
           current_game_score: score,
           current_game_start_time: null,
           status: isFinalGame ? 'completed' : 'active',
+          completed_at: isFinalGame ? now : null, // Add completed_at timestamp for final game
         })
         .eq('contest_id', contestId)
         .eq('user_id', user.id);
@@ -206,7 +208,7 @@ export const GameContainer = ({
         score: score,
         time_taken: timeSpent,
         started_at: gameStartTime?.toISOString(),
-        completed_at: new Date().toISOString(),
+        completed_at: now,
         is_correct: score > 0
       };
 
