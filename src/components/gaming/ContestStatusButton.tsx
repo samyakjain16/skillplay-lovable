@@ -16,7 +16,7 @@ interface ContestStatusButtonProps {
   onClick?: () => void;
   loading?: boolean;
   isInMyContests?: boolean;
-  userCompletedGames?: boolean;  // Add this line
+  userCompletedGames?: boolean;
 }
 
 type ButtonState = {
@@ -32,8 +32,9 @@ export const ContestStatusButton = ({
   onClick, 
   loading,
   isInMyContests,
-  userCompletedGames
+  userCompletedGames 
 }: ContestStatusButtonProps) => {
+  const [localLoading, setLocalLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const queryClient = useQueryClient();
@@ -143,6 +144,17 @@ export const ContestStatusButton = ({
     };
   }, [contest, isInMyContests, userCompletedGames, getTimeStatus]);
 
+  const handleClick = async () => {
+    if (loading || buttonState.disabled) return;
+    
+    setLocalLoading(true);
+    try {
+      await onClick?.();
+    } finally {
+      setLocalLoading(false);
+    }
+  };
+
   useEffect(() => {
     const updateProgress = () => {
       const { progress, hasEnded } = getTimeStatus();
@@ -186,10 +198,10 @@ export const ContestStatusButton = ({
       <Button 
         className={`w-full relative overflow-hidden transition-all duration-500 ${buttonState.customClass}`}
         variant={buttonState.variant}
-        disabled={loading || buttonState.disabled}
-        onClick={onClick}
+        disabled={localLoading || buttonState.disabled}
+        onClick={handleClick}
       >
-        {loading ? (
+        {localLoading ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             {isInMyContests ? "Starting..." : "Joining..."}
