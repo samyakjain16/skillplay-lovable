@@ -1,3 +1,4 @@
+
 import { useParams } from "react-router-dom";
 import { Navigation } from "@/components/Navigation";
 import { useQuery } from "@tanstack/react-query";
@@ -19,7 +20,6 @@ const ContestLeaderboard = () => {
           user_id,
           score,
           status,
-          completed_at,
           profiles:user_id (
             username,
             avatar_url
