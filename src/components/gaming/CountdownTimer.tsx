@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 
 interface CountdownTimerProps {
@@ -8,6 +7,7 @@ interface CountdownTimerProps {
 
 export const CountdownTimer = ({ targetDate, onEnd }: CountdownTimerProps) => {
   const [timeLeft, setTimeLeft] = useState<string>("");
+  const [hasEnded, setHasEnded] = useState(false);
 
   useEffect(() => {
     const calculateTimeLeft = () => {
@@ -16,27 +16,17 @@ export const CountdownTimer = ({ targetDate, onEnd }: CountdownTimerProps) => {
       const difference = target - now;
 
       if (difference <= 0) {
-        setTimeLeft("Time's up!");
-        onEnd?.();
+        if (!hasEnded) {
+          setHasEnded(true);
+          setTimeLeft("Time's up!");
+          onEnd?.();
+        }
         return null;
       }
 
-      // Calculate time units
-      const days = Math.floor(difference / (1000 * 60 * 60 * 24));
-      const hours = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-      const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
-      const seconds = Math.floor((difference % (1000 * 60)) / 1000);
-
-      // Format the time string
-      if (days > 0) {
-        return `${days}d ${hours}h ${minutes}m`;
-      } else if (hours > 0) {
-        return `${hours}h ${minutes}m ${seconds}s`;
-      } else if (minutes > 0) {
-        return `${minutes}m ${seconds}s`;
-      } else {
-        return `${seconds}s`;
-      }
+      // Calculate seconds only for game timer
+      const seconds = Math.ceil(difference / 1000);
+      return `${seconds}s`;
     };
 
     // Initial calculation
@@ -45,7 +35,7 @@ export const CountdownTimer = ({ targetDate, onEnd }: CountdownTimerProps) => {
       setTimeLeft(initialTimeLeft);
     }
 
-    // Update every second
+    // Update every 100ms for smoother countdown
     const timer = setInterval(() => {
       const result = calculateTimeLeft();
       if (result === null) {
@@ -53,10 +43,10 @@ export const CountdownTimer = ({ targetDate, onEnd }: CountdownTimerProps) => {
       } else {
         setTimeLeft(result);
       }
-    }, 1000);
+    }, 100);
 
     return () => clearInterval(timer);
-  }, [targetDate, onEnd]);
+  }, [targetDate, onEnd, hasEnded]);
 
   return <span>{timeLeft}</span>;
 };

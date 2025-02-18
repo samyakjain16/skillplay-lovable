@@ -1,17 +1,14 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
-import { Loader2, Trophy } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { CountdownTimer } from "./CountdownTimer";
 import type { Database } from "@/integrations/supabase/types";
-import { GameContent } from "./GameContent";
-import { useContest } from "./hooks/useContest";
-import { useContestGames } from "./hooks/useContestGames";
-import { useGameProgress } from "./hooks/useGameProgress";
-import { useToast } from "@/components/ui/use-toast";
-import { useQuery } from "@tanstack/react-query";
-import { Progress } from "@/components/ui/progress";
+import { ArrangeSortGame } from "./games/ArrangeSortGame";
+import { TriviaGame } from "./games/TriviaGame";
+import { SpotDifferenceGame } from "./games/SpotDifferenceGame";
 
 type PlayerGameProgress = Database["public"]["Tables"]["player_game_progress"]["Insert"];
 
@@ -31,201 +28,179 @@ export const GameContainer = ({
   initialProgress 
 }: GameContainerProps) => {
   const { user } = useAuth();
-  const { toast } = useToast();
   const [currentGameIndex, setCurrentGameIndex] = useState(initialProgress?.current_game_index || 0);
   const [gameStartTime, setGameStartTime] = useState<Date | null>(
     initialProgress?.current_game_start_time ? new Date(initialProgress.current_game_start_time) : null
   );
-  const [progress, setProgress] = useState(0);
 
-  const { data: contest } = useContest(contestId);
-  const { data: contestGames, isLoading: gamesLoading } = useContestGames(contestId);
-  const { remainingTime, GAME_DURATION, completedGames, isContestEnded } = useGameProgress({
-    user,
-    contestId,
-    currentGameIndex,
-    gameStartTime,
-    contestGames,
-    contest,
-    setCurrentGameIndex,
-    setGameStartTime
-  });
-
-  // Fetch leaderboard with player details
-  const { data: leaderboard, isLoading: leaderboardLoading } = useQuery({
-    queryKey: ["contest-leaderboard", contestId],
+  // Fetch contest details including start_time and end_time
+  const { data: contest, isLoading: isLoadingContest } = useQuery({
+    queryKey: ["contest", contestId],
     queryFn: async () => {
-      console.log("Fetching leaderboard for contest:", contestId);
-      
-      // First get all users who joined the contest
-      const { data: contestUsers, error: usersError } = await supabase
-        .from('user_contests')
-        .select(`
-          user_id,
-          score,
-          profiles:user_id (
-            username,
-            avatar_url
-          )
-        `)
-        .eq('contest_id', contestId);
+      const { data, error } = await supabase
+        .from("contests")
+        .select("*")
+        .eq("id", contestId)
+        .single();
 
-      if (usersError) throw usersError;
-
-      // Map the users to leaderboard entries
-      const leaderboardEntries = contestUsers.map((user: any) => ({
-        user_id: user.user_id,
-        total_score: user.score || 0,
-        username: user.profiles?.username || 'Unknown Player',
-        avatar_url: user.profiles?.avatar_url
-      }));
-
-      // Sort by score and assign ranks
-      return leaderboardEntries
-        .sort((a: any, b: any) => b.total_score - a.total_score)
-        .map((player: any, index: number) => ({
-          ...player,
-          rank: index + 1
-        }));
+      if (error) throw error;
+      return data;
     },
-    enabled: !!contestId && isContestEnded
   });
 
-  // Update progress bar
+  const { data: contestGames, isLoading: isLoadingGames } = useQuery({
+    queryKey: ["contest-games", contestId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("contest_games")
+        .select(`
+          *,
+          game_content (*)
+        `)
+        .eq("contest_id", contestId)
+        .order("sequence_number");
+
+      if (error) throw error;
+      return data;
+    },
+  });
+
   useEffect(() => {
-    if (gameStartTime && remainingTime > 0) {
-      const progressValue = ((GAME_DURATION - remainingTime) / GAME_DURATION) * 100;
-      setProgress(progressValue);
-    } else {
-      setProgress(0);
+    if (!contest || !contestGames || contestGames.length === 0) return;
+
+    const now = new Date();
+    const contestStart = new Date(contest.start_time);
+    const contestEnd = new Date(contest.end_time);
+    const gameDuration = 30000; // 30 seconds in milliseconds
+
+    // If the contest hasn't started yet, wait
+    if (now < contestStart) return;
+
+    // If the contest has ended, don't proceed
+    if (now > contestEnd) return;
+
+    const elapsedTime = now.getTime() - contestStart.getTime();
+    const currentGameByTime = Math.floor(elapsedTime / gameDuration);
+    const timeIntoCurrentGame = elapsedTime % gameDuration;
+
+    // If joining mid-contest or no game time is set
+    if (!gameStartTime) {
+        // Calculate the actual start time by subtracting the time already elapsed in current game
+        const adjustedStartTime = new Date(now.getTime() - timeIntoCurrentGame);
+        
+        setCurrentGameIndex(currentGameByTime);
+        setGameStartTime(adjustedStartTime);
+
+        // Update the progress in the database
+        if (user) {
+            supabase
+                .from('user_contests')
+                .update({ 
+                    current_game_index: currentGameByTime,
+                    current_game_start_time: adjustedStartTime.toISOString()
+                })
+                .eq('contest_id', contestId)
+                .eq('user_id', user.id)
+                .then(({ error }) => {
+                    if (error) console.error('Error updating game progress:', error);
+                });
+        }
     }
-  }, [remainingTime, GAME_DURATION, gameStartTime]);
+}, [contest, contestGames, user, contestId, gameStartTime]);
+
+  const getGameEndTime = (): Date | null => {
+    if (!contest || !gameStartTime) return null;
+
+    const contestStart = new Date(contest.start_time);
+    const nextGameStart = new Date(contestStart.getTime() + (currentGameIndex + 1) * 30000);
+    return nextGameStart;
+  };
 
   const handleGameEnd = async (score: number) => {
     if (!user || !contestGames) return;
 
     const currentGame = contestGames[currentGameIndex];
-    const timeSpent = gameStartTime ? Math.floor((Date.now() - gameStartTime.getTime()) / 1000) : GAME_DURATION;
+    const timeSpent = gameStartTime ? Math.floor((Date.now() - gameStartTime.getTime()) / 1000) : 30;
     const isFinalGame = currentGameIndex === contestGames.length - 1;
 
-    try {
-      // First check if an entry already exists
-      const { data: existingProgress, error: fetchError } = await supabase
-        .from("player_game_progress")
-        .select("id")
-        .match({
-          user_id: user.id,
-          contest_id: contestId,
-          game_content_id: currentGame.game_content_id
-        })
-        .maybeSingle();
+    const progressData: PlayerGameProgress = {
+      user_id: user.id,
+      contest_id: contestId,
+      game_content_id: currentGame.game_content_id,
+      score: score,
+      time_taken: timeSpent,
+      started_at: gameStartTime?.toISOString(),
+      completed_at: new Date().toISOString(),
+      is_correct: score > 0
+    };
 
-      if (fetchError) throw fetchError;
+    // Record game progress
+    const { error: progressError } = await supabase
+      .from("player_game_progress")
+      .insert(progressData);
 
-      if (existingProgress) {
-        toast({
-          title: "Game already completed",
-          description: "Moving to next game...",
-        });
-      } else {
-        // Only insert if no existing progress
-        const progressData: PlayerGameProgress = {
-          user_id: user.id,
-          contest_id: contestId,
-          game_content_id: currentGame.game_content_id,
-          score: score,
-          time_taken: timeSpent,
-          started_at: gameStartTime?.toISOString(),
-          completed_at: new Date().toISOString(),
-          is_correct: score > 0
-        };
+    if (progressError) {
+      console.error("Error recording game progress:", progressError);
+      return;
+    }
 
-        const { error: insertError } = await supabase
-          .from("player_game_progress")
-          .insert(progressData);
-
-        if (insertError) {
-          if (insertError.code === '23505') { // Unique constraint violation
-            console.log("Progress already recorded, continuing...");
-          } else {
-            throw insertError;
-          }
-        }
-      }
-
-      // Update user contest progress
-      const updateData = {
+    // Update user_contests with current game progress
+    const { error: updateError } = await supabase
+      .from('user_contests')
+      .update({
         current_game_index: isFinalGame ? currentGameIndex : currentGameIndex + 1,
         current_game_score: score,
-        current_game_start_time: isFinalGame ? null : new Date().toISOString(),
-        status: isFinalGame ? 'completed' : 'active'
-      };
+        current_game_start_time: null
+      })
+      .eq('contest_id', contestId)
+      .eq('user_id', user.id);
 
-      await supabase
-        .from('user_contests')
-        .update(updateData)
-        .eq('contest_id', contestId)
-        .eq('user_id', user.id);
+    if (updateError) {
+      console.error("Error updating contest progress:", updateError);
+      return;
+    }
 
-      onGameComplete(score, isFinalGame);
-      
-      if (!isFinalGame && !isContestEnded) {
-        setCurrentGameIndex(prev => prev + 1);
-        setGameStartTime(new Date());
-      }
-    } catch (error) {
-      console.error("Error in handleGameEnd:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to save game progress"
-      });
+    onGameComplete(score, isFinalGame);
+    
+    if (!isFinalGame) {
+      setCurrentGameIndex(prev => prev + 1);
+      setGameStartTime(new Date());
     }
   };
 
-  if (isContestEnded) {
-    return (
-      <Card className="p-6">
-        <div className="text-center">
-          <Trophy className="w-16 h-16 mx-auto text-primary mb-4" />
-          <h2 className="text-2xl font-semibold mb-4">Contest Results</h2>
-          
-          {leaderboardLoading ? (
-            <div className="flex flex-col items-center justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin" />
-              <p>Loading results...</p>
-            </div>
-          ) : leaderboard && leaderboard.length > 0 ? (
-            <div className="space-y-4">
-              <div className="divide-y max-w-md mx-auto">
-                {leaderboard.map((entry: any) => (
-                  <div 
-                    key={entry.user_id}
-                    className={`py-3 flex justify-between items-center ${
-                      entry.user_id === user?.id ? 'bg-muted/50 rounded-md px-3' : ''
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="font-medium">#{entry.rank}</span>
-                      <span>{entry.username}</span>
-                    </div>
-                    <span className="font-semibold">{entry.total_score} pts</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="py-8">
-              <p>No participants found in this contest.</p>
-              <p className="text-sm text-muted-foreground mt-2">Try joining the contest first.</p>
-            </div>
-          )}
-        </div>
-      </Card>
-    );
-  }
+  const renderGameContent = (game: any) => {
+    switch (game.game_content.category) {
+      case 'arrange_sort':
+        return (
+          <ArrangeSortGame
+            content={game.game_content.content}
+            onComplete={handleGameEnd}
+          />
+        );
+      case 'trivia':
+        return (
+          <TriviaGame
+            content={game.game_content.content}
+            onComplete={handleGameEnd}
+          />
+        );
+      case 'spot_difference':
+        return (
+          <SpotDifferenceGame
+            content={game.game_content.content}
+            onComplete={handleGameEnd}
+          />
+        );
+      default:
+        return (
+          <div className="text-center py-8">
+            <p>Unsupported game type</p>
+          </div>
+        );
+    }
+  };
 
-  if (gamesLoading) {
+  if (isLoadingContest || isLoadingGames) {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -242,41 +217,23 @@ export const GameContainer = ({
   }
 
   const currentGame = contestGames[currentGameIndex];
-  
-  if (!currentGame) {
-    return (
-      <div className="text-center py-8">
-        <p>Contest completed</p>
-      </div>
-    );
-  }
+  const gameEndTime = getGameEndTime();
 
   return (
     <Card className="p-6">
-      <div className="space-y-4">
-        <div className="flex justify-between items-center">
-          <h3 className="text-lg font-semibold">
-            Game {currentGameIndex + 1} of {contestGames.length}
-          </h3>
-          {gameStartTime && remainingTime > 0 && (
-            <div className="text-sm font-medium">
-              Time Remaining: <CountdownTimer 
-                targetDate={new Date(gameStartTime.getTime() + (remainingTime * 1000))} 
-                onEnd={() => handleGameEnd(0)} 
-              />
-            </div>
-          )}
-        </div>
-
-        <Progress value={progress} className="h-2" />
-
-        {completedGames?.includes(currentGame.game_content_id) ? (
-          <div className="flex items-center justify-center h-[300px]">
-            <p className="text-gray-500">This game has already been completed</p>
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="text-lg font-semibold">
+          Game {currentGameIndex + 1} of {contestGames.length}
+        </h3>
+        {gameEndTime && (
+          <div className="text-sm font-medium">
+            Time Remaining: <CountdownTimer targetDate={gameEndTime} onEnd={() => handleGameEnd(0)} />
           </div>
-        ) : (
-          <GameContent game={currentGame} onComplete={handleGameEnd} />
         )}
+      </div>
+
+      <div className="min-h-[300px]">
+        {renderGameContent(currentGame)}
       </div>
     </Card>
   );
