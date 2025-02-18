@@ -5,9 +5,7 @@ export const Footer = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div>
             <h3 className="text-lg font-semibold mb-4">About SkillPlay</h3>
-            <p className="text-gray-600">
-              Join the ultimate skill-based gaming platform where players compete and win real money prizes.
-            </p>
+            <p className="text-gray-600">Join the ultimate casual games contests where players compete and win real money prizes.</p>
           </div>
           
           <div className="mx-[20px]">
