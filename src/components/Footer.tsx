@@ -1,9 +1,6 @@
-
 import { Facebook, Twitter, Instagram, Linkedin } from 'lucide-react';
-
 export const Footer = () => {
-  return (
-    <footer className="bg-gray-50 mt-auto">
+  return <footer className="bg-gray-50 mt-auto">
       <div className="max-w-7xl mx-auto px-4 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div>
@@ -13,7 +10,7 @@ export const Footer = () => {
             </p>
           </div>
           
-          <div>
+          <div className="mx-[20px]">
             <h3 className="text-lg font-semibold mb-4">Quick Links</h3>
             <ul className="space-y-2">
               <li><a href="/about" className="text-gray-600 hover:text-gray-900">About Us</a></li>
@@ -62,6 +59,5 @@ export const Footer = () => {
           </p>
         </div>
       </div>
-    </footer>
-  );
+    </footer>;
 };
