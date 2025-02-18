@@ -182,7 +182,18 @@ export const GameContainer = ({
     const now = new Date().toISOString();
 
     try {
-      // First, update user_contests to mark current game progress
+      // Calculate new total score by adding current game score
+      const { data: currentUserContest } = await supabase
+        .from('user_contests')
+        .select('score')
+        .eq('contest_id', contestId)
+        .eq('user_id', user.id)
+        .single();
+
+      const previousScore = currentUserContest?.score || 0;
+      const newTotalScore = previousScore + score;
+
+      // Update user_contests with accumulated score and progress
       const { error: updateError } = await supabase
         .from('user_contests')
         .update({
@@ -190,7 +201,8 @@ export const GameContainer = ({
           current_game_score: score,
           current_game_start_time: null,
           status: isFinalGame ? 'completed' : 'active',
-          completed_at: isFinalGame ? now : null, // Add completed_at timestamp for final game
+          completed_at: isFinalGame ? now : null,
+          score: newTotalScore // Update the total score after each game
         })
         .eq('contest_id', contestId)
         .eq('user_id', user.id);
@@ -200,7 +212,7 @@ export const GameContainer = ({
         return;
       }
 
-      // Then, record game progress
+      // Record individual game progress
       const progressData: PlayerGameProgress = {
         user_id: user.id,
         contest_id: contestId,
