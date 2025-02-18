@@ -1,12 +1,15 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Trophy, Target, XCircle, DollarSign } from "lucide-react";
+import { Trophy, Target, ChevronRight } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
 
 export const GameStats = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   const { data: stats } = useQuery({
     queryKey: ["game-stats", user?.id],
@@ -18,12 +21,10 @@ export const GameStats = () => {
         .select("*", { count: 'exact', head: true })
         .eq("user_id", user.id);
 
-      // For now, using placeholder data for wins and earnings
+      // For now, using placeholder data for wins
       return {
         totalContests: totalContests || 0,
         wins: 0, // Placeholder
-        losses: 0, // Placeholder
-        earnings: 0, // Placeholder
       };
     },
     enabled: !!user,
@@ -35,7 +36,7 @@ export const GameStats = () => {
         <CardTitle className="text-xl">Game Statistics</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 gap-4">
           <div className="text-center p-4 bg-background rounded-lg shadow-sm">
             <div className="flex justify-center mb-2">
               <Target className="h-6 w-6 text-primary" />
@@ -51,23 +52,16 @@ export const GameStats = () => {
             <div className="text-2xl font-bold">{stats?.wins || 0}</div>
             <div className="text-sm text-muted-foreground">Wins</div>
           </div>
-
-          <div className="text-center p-4 bg-background rounded-lg shadow-sm">
-            <div className="flex justify-center mb-2">
-              <XCircle className="h-6 w-6 text-red-500" />
-            </div>
-            <div className="text-2xl font-bold">{stats?.losses || 0}</div>
-            <div className="text-sm text-muted-foreground">Losses</div>
-          </div>
-
-          <div className="text-center p-4 bg-background rounded-lg shadow-sm">
-            <div className="flex justify-center mb-2">
-              <DollarSign className="h-6 w-6 text-yellow-500" />
-            </div>
-            <div className="text-2xl font-bold">${stats?.earnings || 0}</div>
-            <div className="text-sm text-muted-foreground">Total Earnings</div>
-          </div>
         </div>
+
+        <Button 
+          variant="outline" 
+          className="w-full mt-4 justify-between"
+          onClick={() => navigate('/stats')} // You'll need to create this route
+        >
+          View Complete Stats
+          <ChevronRight className="h-4 w-4" />
+        </Button>
       </CardContent>
     </Card>
   );
