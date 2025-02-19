@@ -24,7 +24,23 @@ export const useJoinContest = (user: User | null) => {
     mutationFn: async (contestId: string) => {
       if (!user?.id) throw new Error("User not authenticated");
 
-      // Let the database function handle all validations
+      // First verify the contest exists and is joinable
+      const { data: contest, error: contestError } = await supabase
+        .from('contests')
+        .select('*')
+        .eq('id', contestId)
+        .maybeSingle();
+
+      if (contestError) {
+        console.error("Error fetching contest:", contestError);
+        throw new Error("Failed to verify contest status");
+      }
+
+      if (!contest) {
+        throw new Error("Contest not found");
+      }
+
+      // Let the database function handle all other validations
       const { data, error } = await supabase.rpc<'join_contest', JoinContestFunction>(
         'join_contest',
         {
@@ -35,15 +51,10 @@ export const useJoinContest = (user: User | null) => {
 
       if (error) {
         console.error("Join contest error:", error);
-        // Handle specific error cases from the database function
         if (error.message.includes('duplicate key') || error.message.includes('Already joined')) {
           throw new Error("You have already joined this contest");
-        } else if (error.message.includes('Contest is full')) {
-          throw new Error("Contest is full");
-        } else if (error.message.includes('Contest not found')) {
-          throw new Error("Contest not found");
         }
-        throw new Error("Failed to join contest");
+        throw new Error(error.message);
       }
       
       if (!data?.success) {
