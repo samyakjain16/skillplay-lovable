@@ -1,5 +1,5 @@
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { RealtimePostgresChangesPayload } from '@supabase/realtime-js';
@@ -38,6 +38,20 @@ interface UserContest {
 
 export const useContestRealtime = () => {
   const queryClient = useQueryClient();
+  const lastUpdateRef = useRef<{ [key: string]: number }>({});
+
+  const shouldProcessUpdate = (contestId: string) => {
+    const now = Date.now();
+    const lastUpdate = lastUpdateRef.current[contestId] || 0;
+    
+    // Only process updates that are at least 1 second apart
+    if (now - lastUpdate < 1000) {
+      return false;
+    }
+    
+    lastUpdateRef.current[contestId] = now;
+    return true;
+  };
 
   useEffect(() => {
     const channel = supabase
@@ -50,18 +64,22 @@ export const useContestRealtime = () => {
           table: 'contests'
         },
         (payload: RealtimePostgresChangesPayload<Contest>) => {
-          console.log('Received contest update:', payload);
           const newContest = payload.new as Contest;
           const oldContest = payload.old as Partial<Contest>;
           
-          if (!newContest?.id) return;
+          if (!newContest?.id || !shouldProcessUpdate(newContest.id)) return;
 
-          // If contest has ended (either by status change or current time > end_time)
+          console.log('Processing contest update:', payload);
+
           const now = new Date();
           const endTime = new Date(newContest.end_time);
           const hasEnded = now > endTime || newContest.status === 'completed';
 
-          // Force contest status to completed if end time has passed
+          // If already completed, don't process further updates
+          if (oldContest?.status === 'completed' && newContest.status === 'completed') {
+            return;
+          }
+
           const finalContest = {
             ...newContest,
             status: hasEnded ? 'completed' : newContest.status
@@ -74,10 +92,14 @@ export const useContestRealtime = () => {
               if (!oldData) return oldData;
               return oldData.map((participation) => {
                 if (participation.contest.id === finalContest.id) {
-                  return {
-                    ...participation,
-                    contest: { ...participation.contest, ...finalContest }
-                  };
+                  // Only update if the status or other relevant fields have changed
+                  if (participation.contest.status !== finalContest.status ||
+                      participation.contest.current_participants !== finalContest.current_participants) {
+                    return {
+                      ...participation,
+                      contest: { ...participation.contest, ...finalContest }
+                    };
+                  }
                 }
                 return participation;
               });
@@ -91,7 +113,11 @@ export const useContestRealtime = () => {
               if (!oldData) return oldData;
               return oldData.map((contest) => {
                 if (contest.id === finalContest.id) {
-                  return { ...contest, ...finalContest };
+                  // Only update if there are actual changes
+                  if (contest.status !== finalContest.status ||
+                      contest.current_participants !== finalContest.current_participants) {
+                    return { ...contest, ...finalContest };
+                  }
                 }
                 return contest;
               });
