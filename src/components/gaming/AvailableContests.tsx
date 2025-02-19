@@ -14,11 +14,12 @@ type Contest = {
   max_participants: number;
   current_participants: number;
   status: string;
-  start_time: string;
-  end_time: string;
+  start_time: string | null;
+  end_time: string | null;
   prize_pool: number;
   entry_fee: number;
   prize_distribution_type: string;
+  contest_type: string;
 };
 
 export const AvailableContests = () => {
@@ -54,7 +55,7 @@ export const AvailableContests = () => {
         .from("contests")
         .select("*")
         .in("status", ["upcoming", "waiting_for_players"]) // Allow both statuses
-        .gt("end_time", now) // Only get contests that haven't ended
+        .or(`end_time.gt.${now},end_time.is.null`) // Include contests with null end_time or future end_time
         .order("start_time", { ascending: true });
 
       if (error) throw error;
@@ -70,16 +71,16 @@ export const AvailableContests = () => {
   // Filter contests based on our criteria
   const availableContests = contests?.filter(contest => {
     const now = new Date();
-    const endTime = new Date(contest.end_time);
+    const endTime = contest.end_time ? new Date(contest.end_time) : null;
     const isJoined = joinedContests?.includes(contest.id) || false;
     const isFull = contest.current_participants >= contest.max_participants;
     
     // Show contests that:
     // 1. Haven't been joined by the user
-    // 2. Haven't ended yet
+    // 2. Haven't ended yet (or have no end time for fixed_participants)
     // 3. Aren't full
     return !isJoined && 
-           endTime > now && 
+           (!endTime || endTime > now) && 
            !isFull;
   }) || [];
 
@@ -96,3 +97,4 @@ export const AvailableContests = () => {
     </div>
   );
 };
+
