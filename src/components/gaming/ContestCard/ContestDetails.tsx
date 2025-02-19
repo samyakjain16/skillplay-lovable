@@ -32,14 +32,13 @@ export const ContestDetails = ({
     if (!model) return null;
 
     const breakdown = [];
-    for (let i = 1; i <= 3; i++) {
-      const percentage = model.distribution_rules[i.toString()];
-      if (percentage) {
-        const amount = (totalPrizePool * percentage) / 100;
-        breakdown.push({ position: i, amount });
-      }
-    }
-    return breakdown;
+    // Parse the distribution rules and calculate prize amounts
+    Object.entries(model.distribution_rules).forEach(([position, percentage]) => {
+      const amount = (totalPrizePool * percentage) / 100;
+      breakdown.push({ position: parseInt(position), amount });
+    });
+
+    return breakdown.sort((a, b) => a.position - b.position);
   };
 
   const prizeBreakdown = getPrizeBreakdown();
