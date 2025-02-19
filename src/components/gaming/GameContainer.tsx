@@ -1,14 +1,14 @@
 
-import { useEffect, useState, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { useToast } from "@/components/ui/use-toast";
-import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
 import { useGameProgress } from "./hooks/useGameProgress";
 import { useContestAndGames } from "./hooks/useContestAndGames";
+import { useContestState } from "./hooks/useContestState";
 import { GameProgress } from "./GameProgress";
 import { GameContent } from "./GameContent";
+import { ContestCompletionHandler } from "./ContestCompletionHandler";
+import { GameInitializer } from "./GameInitializer";
+import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 
 type PlayerGameProgress = Database["public"]["Tables"]["player_game_progress"]["Insert"];
@@ -29,88 +29,18 @@ export const GameContainer = ({
   initialProgress 
 }: GameContainerProps) => {
   const { user } = useAuth();
-  const { toast } = useToast();
-  const navigate = useNavigate();
-  const [currentGameIndex, setCurrentGameIndex] = useState(initialProgress?.current_game_index || 0);
-  const [gameStartTime, setGameStartTime] = useState<Date | null>(null);
-  const hasRedirected = useRef(false);
-
   const { data: completedGamesCount, refetch: refetchCompletedGames } = useGameProgress(contestId);
   const { contest, contestGames, isLoading } = useContestAndGames(contestId);
-
-  // Effect for contest end check
-  useEffect(() => {
-    if (!contest || hasRedirected.current) return;
-
-    const checkContestEnd = () => {
-      const now = new Date();
-      const contestEnd = new Date(contest.end_time);
-
-      if (now > contestEnd && !hasRedirected.current) {
-        hasRedirected.current = true;
-        toast({
-          title: "Contest Ended",
-          description: "This contest has ended. Redirecting to leaderboard...",
-        });
-        navigate(`/contest/${contestId}/leaderboard`);
-        return true;
-      }
-      return false;
-    };
-
-    const timeCheckInterval = setInterval(checkContestEnd, 1000);
-
-    return () => {
-      clearInterval(timeCheckInterval);
-    };
-  }, [contest, contestId, navigate, toast]);
-
-  // Effect for game initialization
-  useEffect(() => {
-    if (!contest || !contestGames || !user || contestGames.length === 0 || hasRedirected.current) return;
-
-    if (completedGamesCount && completedGamesCount >= contest.series_count) {
-      const now = new Date();
-      const contestEnd = new Date(contest.end_time);
-      
-      if (now > contestEnd) {
-        hasRedirected.current = true;
-        navigate(`/contest/${contestId}/leaderboard`);
-      } else {
-        toast({
-          title: "Contest Still in Progress",
-          description: "You've completed all games. Check back when the contest ends to see the final results!",
-        });
-        navigate('/gaming');
-      }
-      return;
-    }
-
-    const now = new Date();
-    // Always set a fresh start time for the current game
-    setGameStartTime(now);
-
-    // Update game progress in database
-    if (user) {
-      supabase
-        .from('user_contests')
-        .update({ 
-          current_game_index: currentGameIndex,
-          current_game_start_time: now.toISOString()
-        })
-        .eq('contest_id', contestId)
-        .eq('user_id', user.id)
-        .then(({ error }) => {
-          if (error) console.error('Error updating game progress:', error);
-        });
-    }
-  }, [contest, contestGames, user, contestId, currentGameIndex, completedGamesCount, toast, navigate]);
-
-  const getGameEndTime = (): Date | null => {
-    if (!gameStartTime) return null;
-    // Always set end time to exactly 30 seconds after start time
-    return new Date(gameStartTime.getTime() + 30000);
-  };
+  
+  const {
+    currentGameIndex,
+    setCurrentGameIndex,
+    gameStartTime,
+    hasRedirected,
+    getGameEndTime,
+    updateGameProgress,
+    toast
+  } = useContestState(contestId, user, initialProgress);
 
   const handleGameEnd = async (score: number) => {
     if (!user || !contestGames) return;
@@ -172,7 +102,7 @@ export const GameContainer = ({
           console.log("Game already completed, moving to next game");
           if (!isFinalGame) {
             setCurrentGameIndex(prev => prev + 1);
-            setGameStartTime(new Date());
+            updateGameProgress();
           }
           return;
         }
@@ -221,16 +151,32 @@ export const GameContainer = ({
     return <GameProgress contestId={contestId} isContestFinished={isContestFinished} />;
   }
 
-  const currentGame = contestGames[currentGameIndex];
-  const gameEndTime = getGameEndTime();
-
   return (
-    <GameContent 
-      currentGame={currentGame}
-      currentGameIndex={currentGameIndex}
-      totalGames={contestGames.length}
-      gameEndTime={gameEndTime}
-      onGameEnd={handleGameEnd}
-    />
+    <>
+      <ContestCompletionHandler
+        contest={contest}
+        completedGamesCount={completedGamesCount}
+        hasRedirected={hasRedirected}
+      />
+      
+      <GameInitializer
+        contest={contest}
+        contestGames={contestGames}
+        user={user}
+        completedGamesCount={completedGamesCount}
+        hasRedirected={hasRedirected}
+        updateGameProgress={updateGameProgress}
+        navigate={navigate}
+        toast={toast}
+      />
+
+      <GameContent 
+        currentGame={contestGames[currentGameIndex]}
+        currentGameIndex={currentGameIndex}
+        totalGames={contestGames.length}
+        gameEndTime={getGameEndTime()}
+        onGameEnd={handleGameEnd}
+      />
+    </>
   );
 };
