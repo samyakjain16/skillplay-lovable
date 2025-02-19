@@ -23,17 +23,16 @@ export const GameContent = ({
   gameEndTime,
   onGameEnd
 }: GameContentProps) => {
-  // Effect to handle game end when component unmounts or game changes
+  // Effect to handle game end when time runs out
   useEffect(() => {
-    if (gameEndTime) {
-      const timeUntilEnd = new Date(gameEndTime).getTime() - new Date().getTime();
-      if (timeUntilEnd > 0) {
-        const timeout = setTimeout(() => {
-          onGameEnd(0);
-        }, timeUntilEnd);
-        return () => clearTimeout(timeout);
-      }
-    }
+    if (!gameEndTime) return;
+
+    const timeoutId = setTimeout(() => {
+      // When time runs out, submit with score 0
+      onGameEnd(0);
+    }, gameEndTime.getTime() - new Date().getTime());
+
+    return () => clearTimeout(timeoutId);
   }, [gameEndTime, onGameEnd]);
 
   const handleGameComplete = async (
@@ -43,6 +42,12 @@ export const GameContent = ({
   ) => {
     if (!currentGame?.game_content?.category) {
       console.error('Game content or category is missing');
+      onGameEnd(0);
+      return;
+    }
+
+    // If answer is incorrect, immediately return 0 score
+    if (!isCorrect) {
       onGameEnd(0);
       return;
     }
@@ -103,7 +108,6 @@ export const GameContent = ({
     }
   };
 
-  // Check if currentGame exists
   if (!currentGame) {
     return (
       <Card className="p-6">

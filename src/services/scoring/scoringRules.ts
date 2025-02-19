@@ -34,7 +34,6 @@ export async function getScoringRules() {
       rule.game_category, 
       {
         ...rule,
-        // Handle conditions that might be either string or object
         conditions: typeof rule.conditions === 'string' 
           ? JSON.parse(rule.conditions) 
           : rule.conditions
@@ -74,7 +73,6 @@ export async function getSpeedBonusRules() {
   return speedBonusRulesCache;
 }
 
-// Calculate score based on game type, completion status, and time taken
 export async function calculateGameScore(
   gameCategory: string,
   isCorrect: boolean,
@@ -105,9 +103,11 @@ export async function calculateGameScore(
       }
     }
 
-    // Calculate speed bonus
-    const speedBonus = calculateSpeedBonus(timeTaken, speedBonusRules);
-    totalScore += speedBonus;
+    // Only calculate speed bonus for correct answers
+    if (isCorrect) {
+      const speedBonus = calculateSpeedBonus(timeTaken, speedBonusRules);
+      totalScore += speedBonus;
+    }
 
     return totalScore;
   } catch (error) {
@@ -122,7 +122,6 @@ function evaluateConditions(
 ): boolean {
   if (!data) return false;
   
-  // Handle specific conditions based on game type
   switch (conditions.condition) {
     case 'all_spots_found':
       return data.foundSpots === data.totalSpots;

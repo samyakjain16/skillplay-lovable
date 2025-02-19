@@ -32,15 +32,13 @@ export const GameContainer = ({
   const { toast } = useToast();
   const navigate = useNavigate();
   const [currentGameIndex, setCurrentGameIndex] = useState(initialProgress?.current_game_index || 0);
-  const [gameStartTime, setGameStartTime] = useState<Date | null>(
-    initialProgress?.current_game_start_time ? new Date(initialProgress.current_game_start_time) : null
-  );
+  const [gameStartTime, setGameStartTime] = useState<Date | null>(null);
   const hasRedirected = useRef(false);
 
   const { data: completedGamesCount, refetch: refetchCompletedGames } = useGameProgress(contestId);
   const { contest, contestGames, isLoading } = useContestAndGames(contestId);
 
-  // Separate effect for contest end check
+  // Effect for contest end check
   useEffect(() => {
     if (!contest || hasRedirected.current) return;
 
@@ -49,7 +47,7 @@ export const GameContainer = ({
       const contestEnd = new Date(contest.end_time);
 
       if (now > contestEnd && !hasRedirected.current) {
-        hasRedirected.current = true; // Prevent multiple redirects
+        hasRedirected.current = true;
         toast({
           title: "Contest Ended",
           description: "This contest has ended. Redirecting to leaderboard...",
@@ -67,7 +65,7 @@ export const GameContainer = ({
     };
   }, [contest, contestId, navigate, toast]);
 
-  // Main game logic effect
+  // Effect for game initialization
   useEffect(() => {
     if (!contest || !contestGames || !user || contestGames.length === 0 || hasRedirected.current) return;
 
@@ -88,25 +86,17 @@ export const GameContainer = ({
       return;
     }
 
-    const contestStart = new Date(contest.start_time);
     const now = new Date();
-    if (now < contestStart) return;
+    // Always set a fresh start time for the current game
+    setGameStartTime(now);
 
-    if (!gameStartTime) {
-      const elapsedTime = now.getTime() - contestStart.getTime();
-      const gameDuration = 30000; // 30 seconds in milliseconds
-      const currentGameByTime = Math.floor(elapsedTime / gameDuration);
-      const timeIntoCurrentGame = elapsedTime % gameDuration;
-      const adjustedStartTime = new Date(now.getTime() - timeIntoCurrentGame);
-      
-      setCurrentGameIndex(currentGameByTime);
-      setGameStartTime(adjustedStartTime);
-
+    // Update game progress in database
+    if (user) {
       supabase
         .from('user_contests')
         .update({ 
-          current_game_index: currentGameByTime,
-          current_game_start_time: adjustedStartTime.toISOString()
+          current_game_index: currentGameIndex,
+          current_game_start_time: now.toISOString()
         })
         .eq('contest_id', contestId)
         .eq('user_id', user.id)
@@ -114,13 +104,12 @@ export const GameContainer = ({
           if (error) console.error('Error updating game progress:', error);
         });
     }
-  }, [contest, contestGames, user, contestId, gameStartTime, completedGamesCount, toast, navigate]);
+  }, [contest, contestGames, user, contestId, currentGameIndex, completedGamesCount, toast, navigate]);
 
   const getGameEndTime = (): Date | null => {
-    if (!contest || !gameStartTime) return null;
-    const contestStart = new Date(contest.start_time);
-    const nextGameStart = new Date(contestStart.getTime() + (currentGameIndex + 1) * 30000);
-    return nextGameStart;
+    if (!gameStartTime) return null;
+    // Always set end time to exactly 30 seconds after start time
+    return new Date(gameStartTime.getTime() + 30000);
   };
 
   const handleGameEnd = async (score: number) => {
@@ -152,7 +141,7 @@ export const GameContainer = ({
           current_game_start_time: null,
           status: isFinalGame ? 'completed' : 'active',
           completed_at: isFinalGame ? now : null,
-          score: newTotalScore // Update the total score after each game
+          score: newTotalScore
         })
         .eq('contest_id', contestId)
         .eq('user_id', user.id);
@@ -195,7 +184,7 @@ export const GameContainer = ({
       
       if (!isFinalGame) {
         setCurrentGameIndex(prev => prev + 1);
-        setGameStartTime(new Date());
+        // New game will start with fresh timer in the initialization effect
       }
 
     } catch (error) {
