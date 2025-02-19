@@ -50,6 +50,7 @@ export type Database = {
       }
       contests: {
         Row: {
+          contest_type: string | null
           created_at: string | null
           current_participants: number | null
           description: string | null
@@ -57,6 +58,7 @@ export type Database = {
           entry_fee: number
           id: string
           max_participants: number | null
+          prize_calculation_status: string | null
           prize_distribution_type: string
           prize_pool: number
           series_count: number
@@ -66,6 +68,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          contest_type?: string | null
           created_at?: string | null
           current_participants?: number | null
           description?: string | null
@@ -73,6 +76,7 @@ export type Database = {
           entry_fee?: number
           id?: string
           max_participants?: number | null
+          prize_calculation_status?: string | null
           prize_distribution_type?: string
           prize_pool?: number
           series_count?: number
@@ -82,6 +86,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          contest_type?: string | null
           created_at?: string | null
           current_participants?: number | null
           description?: string | null
@@ -89,6 +94,7 @@ export type Database = {
           entry_fee?: number
           id?: string
           max_participants?: number | null
+          prize_calculation_status?: string | null
           prize_distribution_type?: string
           prize_pool?: number
           series_count?: number
@@ -204,6 +210,39 @@ export type Database = {
           },
         ]
       }
+      prize_distribution_models: {
+        Row: {
+          created_at: string | null
+          distribution_rules: Json
+          id: string
+          is_active: boolean | null
+          max_participants: number
+          min_participants: number
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          distribution_rules: Json
+          id?: string
+          is_active?: boolean | null
+          max_participants: number
+          min_participants: number
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          distribution_rules?: Json
+          id?: string
+          is_active?: boolean | null
+          max_participants?: number
+          min_participants?: number
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -234,6 +273,66 @@ export type Database = {
           updated_at?: string
           username?: string | null
           wallet_balance?: number
+        }
+        Relationships: []
+      }
+      scoring_rules: {
+        Row: {
+          additional_points: number | null
+          base_points: number
+          conditions: Json | null
+          created_at: string | null
+          game_category: Database["public"]["Enums"]["game_category"]
+          id: string
+          is_active: boolean | null
+          updated_at: string | null
+        }
+        Insert: {
+          additional_points?: number | null
+          base_points: number
+          conditions?: Json | null
+          created_at?: string | null
+          game_category: Database["public"]["Enums"]["game_category"]
+          id?: string
+          is_active?: boolean | null
+          updated_at?: string | null
+        }
+        Update: {
+          additional_points?: number | null
+          base_points?: number
+          conditions?: Json | null
+          created_at?: string | null
+          game_category?: Database["public"]["Enums"]["game_category"]
+          id?: string
+          is_active?: boolean | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      speed_bonus_rules: {
+        Row: {
+          bonus_points: number
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          time_threshold: number
+          updated_at: string | null
+        }
+        Insert: {
+          bonus_points: number
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          time_threshold: number
+          updated_at?: string | null
+        }
+        Update: {
+          bonus_points?: number
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          time_threshold?: number
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -337,6 +436,12 @@ export type Database = {
       check_and_update_contests: {
         Args: Record<PropertyKey, never>
         Returns: undefined
+      }
+      determine_prize_distribution_type: {
+        Args: {
+          p_max_participants: number
+        }
+        Returns: string
       }
       get_contest_leaderboard: {
         Args: {

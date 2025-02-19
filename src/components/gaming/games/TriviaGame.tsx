@@ -11,16 +11,18 @@ interface TriviaGameProps {
     options: string[];
     correctAnswer: number;
   };
-  onComplete: (score: number) => void;
+  onComplete: (isCorrect: boolean, timeTaken: number) => void;
 }
 
 export const TriviaGame = ({ content, onComplete }: TriviaGameProps) => {
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
+  const startTime = new Date().getTime();
 
   const handleSubmit = () => {
     if (selectedOption === null) return;
-    const score = selectedOption === content.correctAnswer ? 100 : 0;
-    onComplete(score);
+    const timeTaken = Math.floor((new Date().getTime() - startTime) / 1000); // Convert to seconds
+    const isCorrect = selectedOption === content.correctAnswer;
+    onComplete(isCorrect, timeTaken);
   };
 
   return (

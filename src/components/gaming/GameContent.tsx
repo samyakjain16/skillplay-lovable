@@ -5,6 +5,7 @@ import { ArrangeSortGame } from "./games/ArrangeSortGame";
 import { TriviaGame } from "./games/TriviaGame";
 import { SpotDifferenceGame } from "./games/SpotDifferenceGame";
 import { useEffect } from "react";
+import { calculateGameScore } from "@/services/scoring/scoringRules";
 
 interface GameContentProps {
   currentGame: any;
@@ -34,27 +35,47 @@ export const GameContent = ({
     }
   }, [gameEndTime, onGameEnd]);
 
+  const handleGameComplete = async (
+    isCorrect: boolean,
+    timeTaken: number,
+    additionalData?: Record<string, any>
+  ) => {
+    try {
+      const score = await calculateGameScore(
+        currentGame.game_content.category,
+        isCorrect,
+        timeTaken,
+        additionalData
+      );
+      onGameEnd(score);
+    } catch (error) {
+      console.error('Error calculating game score:', error);
+      onGameEnd(0);
+    }
+  };
+
   const renderGameContent = (game: any) => {
     switch (game.game_content.category) {
       case 'arrange_sort':
         return (
           <ArrangeSortGame
             content={game.game_content.content}
-            onComplete={onGameEnd}
+            onComplete={(isCorrect, timeTaken) => handleGameComplete(isCorrect, timeTaken)}
           />
         );
       case 'trivia':
         return (
           <TriviaGame
             content={game.game_content.content}
-            onComplete={onGameEnd}
+            onComplete={(isCorrect, timeTaken) => handleGameComplete(isCorrect, timeTaken)}
           />
         );
       case 'spot_difference':
         return (
           <SpotDifferenceGame
             content={game.game_content.content}
-            onComplete={onGameEnd}
+            onComplete={(isCorrect, timeTaken, data) => 
+              handleGameComplete(isCorrect, timeTaken, data)}
           />
         );
       default:
@@ -85,4 +106,3 @@ export const GameContent = ({
     </Card>
   );
 };
-
