@@ -76,3 +76,64 @@ export async function calculatePrizeDistribution(
 
   return prizeDistribution;
 }
+
+export async function distributePrizes(
+  contestId: string,
+  prizeDistribution: Map<string, number>
+): Promise<void> {
+  const { data: contest, error: contestError } = await supabase
+    .from('contests')
+    .select('*')
+    .eq('id', contestId)
+    .single();
+
+  if (contestError) throw contestError;
+  if (contest.prize_calculation_status === 'completed') return;
+
+  // Start a transaction using the Supabase client
+  const client = supabase;
+
+  // Update each winner's wallet balance and create transaction records
+  for (const [userId, prizeAmount] of prizeDistribution.entries()) {
+    const { error: updateError } = await client
+      .from('profiles')
+      .update({ 
+        wallet_balance: client.rpc('increment', { 
+          row_id: userId,
+          amount: prizeAmount 
+        })
+      })
+      .eq('id', userId);
+
+    if (updateError) {
+      console.error('Error updating wallet balance:', updateError);
+      continue;
+    }
+
+    // Create wallet transaction record
+    const { error: transactionError } = await client
+      .from('wallet_transactions')
+      .insert({
+        user_id: userId,
+        amount: prizeAmount,
+        type: 'prize_payout',
+        reference_id: contestId,
+        status: 'completed'
+      });
+
+    if (transactionError) {
+      console.error('Error creating transaction record:', transactionError);
+    }
+  }
+
+  // Update contest status
+  const { error: statusError } = await client
+    .from('contests')
+    .update({ prize_calculation_status: 'completed' })
+    .eq('id', contestId);
+
+  if (statusError) {
+    console.error('Error updating contest status:', statusError);
+    throw statusError;
+  }
+}
