@@ -14,8 +14,6 @@ import { Card } from "@/components/ui/card";
 interface LeaderboardEntry {
   user_id: string;
   total_score: number;
-  games_completed: number;
-  average_time: number;
   rank: number;
   username?: string | null;
   prize?: number;
@@ -162,8 +160,6 @@ const ContestLeaderboard = () => {
                       <th className="text-left p-4">Rank</th>
                       <th className="text-left p-4">Player</th>
                       <th className="text-right p-4">Score</th>
-                      <th className="text-right p-4">Games</th>
-                      <th className="text-right p-4">Avg Time</th>
                       {contest?.status === 'completed' && contest.prize_pool > 0 && (
                         <th className="text-right p-4">Prize</th>
                       )}
@@ -178,12 +174,6 @@ const ContestLeaderboard = () => {
                         </td>
                         <td className="p-4 text-right">
                           {entry.total_score.toLocaleString()}
-                        </td>
-                        <td className="p-4 text-right">
-                          {entry.games_completed}
-                        </td>
-                        <td className="p-4 text-right">
-                          {entry.average_time.toFixed(1)}s
                         </td>
                         {contest?.status === 'completed' && contest.prize_pool > 0 && (
                           <td className="p-4 text-right font-medium">
