@@ -90,20 +90,13 @@ export const ContestStatusButton = ({
   if (isInMyContests) {
     const isWaitingForPlayers = 
       contest.contest_type === 'fixed_participants' && 
-      contest.current_participants < contest.max_participants &&
-      (contest.status === 'waiting_for_players' || contest.status === 'upcoming');
+      contest.current_participants < contest.max_participants;
 
-    const now = new Date();
-    const startTime = contest.start_time ? new Date(contest.start_time) : null;
-    const endTime = contest.end_time ? new Date(contest.end_time) : null;
-    const hasEnded = endTime && now > endTime;
-
-    // Determine button state based on contest status
-    if (contest.status === 'waiting_for_players' || isWaitingForPlayers) {
+    if (isWaitingForPlayers) {
       buttonState.text = `Waiting for Players (${contest.current_participants}/${contest.max_participants})`;
       buttonState.disabled = true;
       buttonState.customClass = "bg-gray-400 text-white cursor-not-allowed";
-    } else if (contest.status === "completed" || hasEnded) {
+    } else if (contest.status === "completed") {
       buttonState.text = "View Leaderboard";
       buttonState.variant = "default";
       buttonState.customClass = "bg-gray-600 hover:bg-gray-700 text-white";
@@ -114,25 +107,12 @@ export const ContestStatusButton = ({
     } else if (contest.status === "in_progress") {
       buttonState.text = "Continue Playing";
       buttonState.customClass = "bg-blue-500 hover:bg-blue-600 text-white";
-    } else if (startTime && now < startTime && contest.contest_type !== 'fixed_participants') {
-      buttonState.text = "Starting Soon";
-      buttonState.disabled = true;
-      buttonState.customClass = "bg-gray-400 text-white cursor-not-allowed";
     } else {
       buttonState.text = "Start Playing";
       buttonState.customClass = "bg-blue-500 hover:bg-blue-600 text-white";
     }
   } else {
-    const now = new Date();
-    const endTime = contest.end_time ? new Date(contest.end_time) : null;
-    const hasEnded = endTime && now > endTime;
-
-    if (hasEnded) {
-      buttonState.text = "Contest Ended";
-      buttonState.variant = "default";
-      buttonState.disabled = true;
-      buttonState.customClass = "bg-gray-600 text-white";
-    } else if (contest.current_participants >= contest.max_participants) {
+    if (contest.current_participants >= contest.max_participants) {
       buttonState.text = "Contest Full";
       buttonState.variant = "default";
       buttonState.disabled = true;

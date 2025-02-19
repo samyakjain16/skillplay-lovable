@@ -31,8 +31,7 @@ export const ContestCard = ({
   
   const isWaitingForPlayers = 
     contest.contest_type === 'fixed_participants' && 
-    contest.current_participants < contest.max_participants &&
-    (contest.status === 'waiting_for_players' || contest.status === 'upcoming');
+    contest.current_participants < contest.max_participants;
 
   const handleContestAction = () => {
     // For contests in "Available Contests"
@@ -47,18 +46,6 @@ export const ContestCard = ({
         return;
       }
 
-      // Check if contest has ended
-      const now = new Date();
-      const endTime = contest.end_time ? new Date(contest.end_time) : null;
-      if (endTime && now > endTime) {
-        toast({
-          variant: "destructive",
-          title: "Contest Ended",
-          description: "This contest has already ended.",
-        });
-        return;
-      }
-
       // Allow joining for any valid contest
       onJoin?.(contest.id);
       return;
@@ -66,11 +53,10 @@ export const ContestCard = ({
 
     // For contests in "My Contests"
     const now = new Date();
-    const startTime = contest.start_time ? new Date(contest.start_time) : null;
     const endTime = contest.end_time ? new Date(contest.end_time) : null;
 
-    // If contest is completed or has ended
-    if (contest.status === 'completed' || (endTime && now > endTime)) {
+    // If contest is completed
+    if (contest.status === 'completed') {
       navigate(`/contest/${contest.id}/leaderboard`);
       return;
     }
@@ -80,20 +66,6 @@ export const ContestCard = ({
       toast({
         title: "Waiting for Players",
         description: `Contest will begin when ${contest.max_participants} players have joined.`,
-      });
-      return;
-    }
-
-    // Contest hasn't started yet
-    if (startTime && now < startTime && contest.contest_type !== 'fixed_participants') {
-      const timeUntilStart = startTime.getTime() - now.getTime();
-      const minutesUntilStart = Math.ceil(timeUntilStart / (1000 * 60));
-      
-      toast({
-        title: "Contest Not Started",
-        description: minutesUntilStart <= 60 
-          ? `Contest will begin in ${minutesUntilStart} minute${minutesUntilStart === 1 ? '' : 's'}`
-          : `Contest will begin at ${startTime.toLocaleTimeString()} on ${startTime.toLocaleDateString()}`,
       });
       return;
     }
@@ -108,16 +80,13 @@ export const ContestCard = ({
     }
 
     // Contest is active and user hasn't completed games
-    if ((!startTime || now >= startTime) && (!endTime || now <= endTime) || contest.status === 'in_progress') {
-      onStart?.(contest.id);
-      return;
-    }
+    onStart?.(contest.id);
   };
   
   return (
     <Card 
       className={`w-full transition-all duration-200 hover:shadow-lg ${
-        contest.status === 'completed' || (contest.end_time && new Date() > new Date(contest.end_time))
+        contest.status === 'completed'
           ? 'cursor-pointer opacity-75'
           : isWaitingForPlayers
           ? 'cursor-not-allowed opacity-75'
