@@ -79,9 +79,17 @@ export const ContestDetails = ({
         <span>${entryFee}</span>
       </div>
 
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Hash className="h-4 w-4 text-primary" />
+          <span>Series</span>
+        </div>
+        <span>{seriesCount} Games</span>
+      </div>
+      
       {prizeBreakdown && (
         <div className="border-t border-gray-100 pt-2 mt-2">
-          <div className="text-xs font-medium text-muted-foreground mb-2">Prize Distribution</div>
+          <div className="text-xs font-medium text-primary mb-2">Prize Distribution</div>
           {prizeBreakdown.map(({ position, amount }) => (
             <div key={position} className="flex items-center justify-between text-xs">
               <div className="flex items-center gap-1">
@@ -94,13 +102,7 @@ export const ContestDetails = ({
         </div>
       )}
 
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Hash className="h-4 w-4 text-primary" />
-          <span>Series</span>
-        </div>
-        <span>{seriesCount} Games</span>
-      </div>
+      
 
       {contestType !== 'fixed_participants' && (
         <div className="flex items-center justify-between">
