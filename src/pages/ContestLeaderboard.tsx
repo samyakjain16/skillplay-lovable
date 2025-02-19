@@ -32,7 +32,7 @@ const ContestLeaderboard = () => {
         .from("contests")
         .select("*")
         .eq("id", id)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
       return data;
@@ -44,54 +44,78 @@ const ContestLeaderboard = () => {
     queryFn: async () => {
       if (!contest) return [];
 
-      // Get leaderboard data and user profiles
-      const { data: rankings } = await supabase
-        .rpc('get_contest_leaderboard', { contest_id: id });
+      try {
+        // Get leaderboard data
+        const { data: rankings, error: rankingsError } = await supabase
+          .rpc('get_contest_leaderboard', { contest_id: id });
 
-      if (!rankings) return [];
-
-      // Get usernames for the rankings
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, username')
-        .in('id', rankings.map(r => r.user_id));
-
-      const usernameMap = new Map(
-        profiles?.map(p => [p.id, p.username]) || []
-      );
-
-      // Calculate prize distribution if contest has ended
-      if (contest.status === 'completed' && contest.prize_pool > 0) {
-        try {
-          const prizes = await calculatePrizeDistribution(
-            id!,
-            contest.prize_pool,
-            contest.prize_distribution_type
-          );
-
-          // Combine rankings with usernames and prize information
-          return rankings.map(rank => ({
-            ...rank,
-            username: usernameMap.get(rank.user_id) || 'Anonymous',
-            prize: prizes.get(rank.user_id) || 0
-          }));
-        } catch (error) {
-          console.error('Error calculating prizes:', error);
-          toast({
-            variant: "destructive",
-            title: "Error",
-            description: "Failed to calculate prize distribution"
-          });
+        if (rankingsError) {
+          console.error('Error fetching rankings:', rankingsError);
+          throw rankingsError;
         }
-      }
 
-      // Return rankings with usernames but no prizes
-      return rankings.map(rank => ({
-        ...rank,
-        username: usernameMap.get(rank.user_id) || 'Anonymous'
-      }));
+        if (!rankings || rankings.length === 0) {
+          console.log('No rankings found');
+          return [];
+        }
+
+        // Get usernames for the rankings
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, username')
+          .in('id', rankings.map(r => r.user_id));
+
+        if (profilesError) {
+          console.error('Error fetching profiles:', profilesError);
+          throw profilesError;
+        }
+
+        const usernameMap = new Map(
+          profiles?.map(p => [p.id, p.username]) || []
+        );
+
+        // Calculate prize distribution if contest has ended
+        if (contest.status === 'completed' && contest.prize_pool > 0) {
+          try {
+            const prizes = await calculatePrizeDistribution(
+              id!,
+              contest.prize_pool,
+              contest.prize_distribution_type
+            );
+
+            // Combine rankings with usernames and prize information
+            return rankings.map(rank => ({
+              ...rank,
+              username: usernameMap.get(rank.user_id) || 'Anonymous',
+              prize: prizes.get(rank.user_id) || 0
+            }));
+          } catch (error) {
+            console.error('Error calculating prizes:', error);
+            toast({
+              variant: "destructive",
+              title: "Error",
+              description: "Failed to calculate prize distribution"
+            });
+          }
+        }
+
+        // Return rankings with usernames but no prizes
+        return rankings.map(rank => ({
+          ...rank,
+          username: usernameMap.get(rank.user_id) || 'Anonymous'
+        }));
+      } catch (error) {
+        console.error('Error in leaderboard query:', error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to load leaderboard"
+        });
+        return [];
+      }
     },
-    enabled: !!contest
+    enabled: !!contest,
+    refetchInterval: (contest?.status === 'in_progress') ? 5000 : false // Refresh every 5 seconds if contest is in progress
   });
 
   return (
@@ -121,7 +145,7 @@ const ContestLeaderboard = () => {
             <div className="flex justify-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
-          ) : (
+          ) : leaderboard && leaderboard.length > 0 ? (
             <div className="bg-white rounded-lg shadow">
               <div className="p-4">
                 <table className="w-full">
@@ -136,7 +160,7 @@ const ContestLeaderboard = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {leaderboard?.map((entry) => (
+                    {leaderboard.map((entry) => (
                       <tr key={entry.user_id} className="border-b last:border-0">
                         <td className="py-4">#{entry.rank}</td>
                         <td className="py-4">
@@ -155,6 +179,10 @@ const ContestLeaderboard = () => {
                   </tbody>
                 </table>
               </div>
+            </div>
+          ) : (
+            <div className="bg-white rounded-lg shadow p-8 text-center">
+              <p className="text-muted-foreground">No participants yet</p>
             </div>
           )}
           
