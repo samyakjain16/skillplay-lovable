@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,7 @@ interface ArrangeSortGameProps {
 
 export const ArrangeSortGame = ({ content, onComplete }: ArrangeSortGameProps) => {
   const [items, setItems] = useState([...content.items]);
+  const startTime = new Date().getTime();
 
   const handleItemMove = (fromIndex: number, toIndex: number) => {
     const newItems = [...items];
@@ -21,10 +23,11 @@ export const ArrangeSortGame = ({ content, onComplete }: ArrangeSortGameProps) =
   };
 
   const handleSubmit = () => {
-    const score = items.every((item, index) => 
+    const timeTaken = Math.floor((new Date().getTime() - startTime) / 1000); // Convert to seconds
+    const isCorrect = items.every((item, index) => 
       content.items[content.correctOrder[index]] === item
     );
-    onComplete(score, 0);
+    onComplete(isCorrect, timeTaken);
   };
 
   return (

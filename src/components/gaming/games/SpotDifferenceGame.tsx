@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -13,6 +14,7 @@ interface SpotDifferenceGameProps {
 
 export const SpotDifferenceGame = ({ content, onComplete }: SpotDifferenceGameProps) => {
   const [foundDifferences, setFoundDifferences] = useState<number[]>([]);
+  const startTime = new Date().getTime();
 
   const handleClick = (imageNumber: number, x: number, y: number) => {
     const clickRadius = 20; // pixels
@@ -35,8 +37,15 @@ export const SpotDifferenceGame = ({ content, onComplete }: SpotDifferenceGamePr
   };
 
   const handleSubmit = () => {
+    const timeTaken = Math.floor((new Date().getTime() - startTime) / 1000); // Convert to seconds
     const score = Math.round((foundDifferences.length / content.differences.length) * 100);
-    onComplete(true, 0, { score });
+    
+    // We pass additional data for scoring conditions
+    onComplete(true, timeTaken, { 
+      score,
+      foundSpots: foundDifferences.length,
+      totalSpots: content.differences.length
+    });
   };
 
   return (
