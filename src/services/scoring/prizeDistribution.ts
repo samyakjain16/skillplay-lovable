@@ -95,13 +95,20 @@ export async function distributePrizes(
 
   // Update each winner's wallet balance and create transaction records
   for (const [userId, prizeAmount] of prizeDistribution.entries()) {
+    // Get current wallet balance
+    const { data: profile } = await client
+      .from('profiles')
+      .select('wallet_balance')
+      .eq('id', userId)
+      .single();
+    
+    if (!profile) continue;
+
+    // Update wallet balance directly
     const { error: updateError } = await client
       .from('profiles')
       .update({ 
-        wallet_balance: client.rpc('increment', { 
-          row_id: userId,
-          amount: prizeAmount 
-        })
+        wallet_balance: profile.wallet_balance + prizeAmount
       })
       .eq('id', userId);
 
