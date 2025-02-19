@@ -34,7 +34,10 @@ export async function getScoringRules() {
       rule.game_category, 
       {
         ...rule,
-        conditions: rule.conditions ? JSON.parse(rule.conditions) : null
+        // Handle conditions that might be either string or object
+        conditions: typeof rule.conditions === 'string' 
+          ? JSON.parse(rule.conditions) 
+          : rule.conditions
       }
     ])
   );
@@ -60,7 +63,6 @@ export async function getSpeedBonusRules() {
 
   if (error) {
     console.error('Error fetching speed bonus rules:', error);
-    // Fall back to cache if available, otherwise throw
     if (speedBonusRulesCache) return speedBonusRulesCache;
     throw error;
   }
@@ -79,34 +81,39 @@ export async function calculateGameScore(
   timeTaken: number,
   additionalData?: Record<string, any>
 ): Promise<number> {
-  const scoringRules = await getScoringRules();
-  const speedBonusRules = await getSpeedBonusRules();
-  
-  // Get base scoring rule for game type
-  const rule = scoringRules.get(gameCategory);
-  if (!rule) {
-    console.error(`No scoring rule found for game category: ${gameCategory}`);
+  try {
+    const scoringRules = await getScoringRules();
+    const speedBonusRules = await getSpeedBonusRules();
+    
+    // Get base scoring rule for game type
+    const rule = scoringRules.get(gameCategory);
+    if (!rule) {
+      console.error(`No scoring rule found for game category: ${gameCategory}`);
+      return 0;
+    }
+
+    // If answer is incorrect, return 0
+    if (!isCorrect) return 0;
+
+    let totalScore = rule.base_points;
+
+    // Add additional points based on conditions if they exist
+    if (rule.additional_points && rule.conditions) {
+      const conditionMet = evaluateConditions(rule.conditions, additionalData);
+      if (conditionMet) {
+        totalScore += rule.additional_points;
+      }
+    }
+
+    // Calculate speed bonus
+    const speedBonus = calculateSpeedBonus(timeTaken, speedBonusRules);
+    totalScore += speedBonus;
+
+    return totalScore;
+  } catch (error) {
+    console.error('Error calculating game score:', error);
     return 0;
   }
-
-  // If answer is incorrect, return 0
-  if (!isCorrect) return 0;
-
-  let totalScore = rule.base_points;
-
-  // Add additional points based on conditions if they exist
-  if (rule.additional_points && rule.conditions) {
-    const conditionMet = evaluateConditions(rule.conditions, additionalData);
-    if (conditionMet) {
-      totalScore += rule.additional_points;
-    }
-  }
-
-  // Calculate speed bonus
-  const speedBonus = calculateSpeedBonus(timeTaken, speedBonusRules);
-  totalScore += speedBonus;
-
-  return totalScore;
 }
 
 function evaluateConditions(
@@ -119,7 +126,10 @@ function evaluateConditions(
   switch (conditions.condition) {
     case 'all_spots_found':
       return data.foundSpots === data.totalSpots;
-    // Add more condition types as needed
+    case 'perfect_score':
+      return data.score === 100;
+    case 'quick_completion':
+      return data.timeTaken && data.timeTaken < conditions.threshold;
     default:
       return false;
   }
