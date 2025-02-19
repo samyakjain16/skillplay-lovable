@@ -33,7 +33,7 @@ export const ContestCard = ({
     contest.contest_type === 'fixed_participants' && 
     contest.current_participants < contest.max_participants;
 
-  const handleContestAction = (e: React.MouseEvent) => {
+  const handleContestAction = () => {
     // For contests in "Available Contests"
     if (!isInMyContests) {
       // Check if contest is full
@@ -52,10 +52,8 @@ export const ContestCard = ({
     }
 
     // For contests in "My Contests"
-    // If fixed_participants contest is waiting for players, prevent any action
+    // If fixed_participants contest is waiting for players, show message and prevent action
     if (isWaitingForPlayers) {
-      e.preventDefault();
-      e.stopPropagation();
       toast({
         title: "Waiting for Players",
         description: `Contest will begin when ${contest.max_participants} players have joined.`,
@@ -82,9 +80,6 @@ export const ContestCard = ({
     onStart?.(contest.id);
   };
   
-  // Determine if the card should be clickable
-  const isClickable = !isWaitingForPlayers || !isInMyContests;
-  
   return (
     <Card 
       className={`w-full transition-all duration-200 hover:shadow-lg ${
@@ -96,7 +91,7 @@ export const ContestCard = ({
             ? 'cursor-wait' 
             : 'cursor-pointer'
       }`}
-      onClick={isClickable ? handleContestAction : undefined}
+      onClick={isWaitingForPlayers && isInMyContests ? undefined : handleContestAction}
     >
       <CardContent className="p-6">
         <div className="space-y-4">
