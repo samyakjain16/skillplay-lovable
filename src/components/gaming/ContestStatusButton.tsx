@@ -87,12 +87,12 @@ export const ContestStatusButton = ({
   };
 
   // Modify button state based on contest conditions
-  if (contest.status === "completed") {
-    buttonState.text = "View Leaderboard";
-    buttonState.variant = "default";
-    buttonState.customClass = "bg-gray-600 hover:bg-gray-700 text-white";
-  } else if (isInMyContests) {
-    if (contest.contest_type === 'fixed_participants' && contest.current_participants < contest.max_participants) {
+  if (isInMyContests) {
+    if (contest.status === "completed") {
+      buttonState.text = "View Leaderboard";
+      buttonState.variant = "default";
+      buttonState.customClass = "bg-gray-600 hover:bg-gray-700 text-white";
+    } else if (contest.contest_type === 'fixed_participants' && contest.current_participants < contest.max_participants) {
       buttonState.text = "Waiting for Players";
       buttonState.disabled = true;
       buttonState.customClass = "bg-gray-400 text-white cursor-not-allowed";
@@ -102,6 +102,13 @@ export const ContestStatusButton = ({
       buttonState.customClass = "bg-blue-600 text-white";
     } else if (contest.status === "in_progress") {
       buttonState.text = "Continue Playing";
+      buttonState.customClass = "bg-blue-500 hover:bg-blue-600 text-white";
+    } else if (!contest.start_time || new Date() < new Date(contest.start_time)) {
+      buttonState.text = "Starting Soon";
+      buttonState.disabled = true;
+      buttonState.customClass = "bg-gray-400 text-white cursor-not-allowed";
+    } else {
+      buttonState.text = "Start Playing";
       buttonState.customClass = "bg-blue-500 hover:bg-blue-600 text-white";
     }
   } else {
