@@ -88,14 +88,19 @@ export const ContestStatusButton = ({
 
   // Modify button state based on contest conditions
   if (isInMyContests) {
-    if (contest.status === "completed") {
-      buttonState.text = "View Leaderboard";
-      buttonState.variant = "default";
-      buttonState.customClass = "bg-gray-600 hover:bg-gray-700 text-white";
-    } else if (contest.contest_type === 'fixed_participants' && contest.current_participants < contest.max_participants) {
+    const isWaitingForPlayers = 
+      contest.contest_type === 'fixed_participants' && 
+      contest.current_participants < contest.max_participants &&
+      contest.status === 'waiting_for_players';
+
+    if (isWaitingForPlayers) {
       buttonState.text = "Waiting for Players";
       buttonState.disabled = true;
       buttonState.customClass = "bg-gray-400 text-white cursor-not-allowed";
+    } else if (contest.status === "completed") {
+      buttonState.text = "View Leaderboard";
+      buttonState.variant = "default";
+      buttonState.customClass = "bg-gray-600 hover:bg-gray-700 text-white";
     } else if (userCompletedGames) {
       buttonState.text = "Games Completed";
       buttonState.disabled = true;

@@ -29,20 +29,12 @@ export const ContestCard = ({
   const { toast } = useToast();
   const navigate = useNavigate();
   
-  const isWaitingForPlayers = isInMyContests && 
+  const isWaitingForPlayers = 
     contest.contest_type === 'fixed_participants' && 
-    contest.current_participants < contest.max_participants;
+    contest.current_participants < contest.max_participants &&
+    contest.status === 'waiting_for_players';
 
   const handleContestAction = () => {
-    // If waiting for players, don't allow any action
-    if (isWaitingForPlayers) {
-      toast({
-        title: "Waiting for Players",
-        description: `Contest will begin when ${contest.max_participants} players have joined.`,
-      });
-      return;
-    }
-
     // For contests in "Available Contests"
     if (!isInMyContests) {
       // Check if contest is full
@@ -65,20 +57,14 @@ export const ContestCard = ({
     const startTime = contest.start_time ? new Date(contest.start_time) : null;
     const endTime = contest.end_time ? new Date(contest.end_time) : null;
 
-    // If contest is completed, navigate to leaderboard
-    if (contest.status === 'completed') {
-      navigate(`/contest/${contest.id}/leaderboard`);
-      return;
-    }
-
-    // If contest has ended by time
-    if (endTime && now > endTime) {
+    // If contest is completed or has ended
+    if (contest.status === 'completed' || (endTime && now > endTime)) {
       navigate(`/contest/${contest.id}/leaderboard`);
       return;
     }
 
     // If fixed_participants contest is waiting for players
-    if (contest.contest_type === 'fixed_participants' && contest.status === 'waiting_for_players') {
+    if (isWaitingForPlayers) {
       toast({
         title: "Waiting for Players",
         description: `Contest will begin when ${contest.max_participants} players have joined.`,
