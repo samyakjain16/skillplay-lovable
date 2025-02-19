@@ -9,6 +9,17 @@ import { calculatePrizeDistribution } from "@/services/scoring/prizeDistribution
 import { useToast } from "@/components/ui/use-toast";
 import { Trophy } from "lucide-react";
 
+// Define types for our leaderboard data
+interface LeaderboardEntry {
+  user_id: string;
+  total_score: number;
+  games_completed: number;
+  average_time: number;
+  rank: number;
+  username?: string | null;
+  prize?: number;
+}
+
 const ContestLeaderboard = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -28,15 +39,26 @@ const ContestLeaderboard = () => {
     }
   });
 
-  const { data: leaderboard, isLoading } = useQuery({
+  const { data: leaderboard, isLoading } = useQuery<LeaderboardEntry[]>({
     queryKey: ["contest-leaderboard", id],
     queryFn: async () => {
-      if (!contest) return null;
+      if (!contest) return [];
 
+      // Get leaderboard data and user profiles
       const { data: rankings } = await supabase
         .rpc('get_contest_leaderboard', { contest_id: id });
 
-      if (!rankings) return null;
+      if (!rankings) return [];
+
+      // Get usernames for the rankings
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, username')
+        .in('id', rankings.map(r => r.user_id));
+
+      const usernameMap = new Map(
+        profiles?.map(p => [p.id, p.username]) || []
+      );
 
       // Calculate prize distribution if contest has ended
       if (contest.status === 'completed' && contest.prize_pool > 0) {
@@ -47,9 +69,10 @@ const ContestLeaderboard = () => {
             contest.prize_distribution_type
           );
 
-          // Combine rankings with prize information
+          // Combine rankings with usernames and prize information
           return rankings.map(rank => ({
             ...rank,
+            username: usernameMap.get(rank.user_id) || 'Anonymous',
             prize: prizes.get(rank.user_id) || 0
           }));
         } catch (error) {
@@ -59,11 +82,14 @@ const ContestLeaderboard = () => {
             title: "Error",
             description: "Failed to calculate prize distribution"
           });
-          return rankings;
         }
       }
 
-      return rankings;
+      // Return rankings with usernames but no prizes
+      return rankings.map(rank => ({
+        ...rank,
+        username: usernameMap.get(rank.user_id) || 'Anonymous'
+      }));
     },
     enabled: !!contest
   });
@@ -121,7 +147,7 @@ const ContestLeaderboard = () => {
                         </td>
                         {contest?.status === 'completed' && contest.prize_pool > 0 && (
                           <td className="py-4 text-right font-medium">
-                            {entry.prize > 0 ? `$${entry.prize.toFixed(2)}` : '-'}
+                            {entry.prize ? `$${entry.prize.toFixed(2)}` : '-'}
                           </td>
                         )}
                       </tr>
