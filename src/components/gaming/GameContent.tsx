@@ -6,6 +6,7 @@ import { TriviaGame } from "./games/TriviaGame";
 import { SpotDifferenceGame } from "./games/SpotDifferenceGame";
 import { useEffect } from "react";
 import { calculateGameScore } from "@/services/scoring/scoringRules";
+import { Loader2 } from "lucide-react";
 
 interface GameContentProps {
   currentGame: any;
@@ -40,6 +41,12 @@ export const GameContent = ({
     timeTaken: number,
     additionalData?: Record<string, any>
   ) => {
+    if (!currentGame?.game_content?.category) {
+      console.error('Game content or category is missing');
+      onGameEnd(0);
+      return;
+    }
+
     try {
       const score = await calculateGameScore(
         currentGame.game_content.category,
@@ -55,6 +62,15 @@ export const GameContent = ({
   };
 
   const renderGameContent = (game: any) => {
+    // Check if game content exists
+    if (!game?.game_content) {
+      return (
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      );
+    }
+
     switch (game.game_content.category) {
       case 'arrange_sort':
         return (
@@ -86,6 +102,17 @@ export const GameContent = ({
         );
     }
   };
+
+  // Check if currentGame exists
+  if (!currentGame) {
+    return (
+      <Card className="p-6">
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <Card className="p-6">
