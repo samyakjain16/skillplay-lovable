@@ -26,7 +26,7 @@ export const AvailableContests = () => {
   const queryClient = useQueryClient();
   const joinContestMutation = useJoinContest(user);
 
-  // Set up real-time subscription without passing any arguments
+  // Set up real-time subscription
   useContestRealtime();
 
   // Query to get user's joined contests
@@ -53,8 +53,8 @@ export const AvailableContests = () => {
       const { data, error } = await supabase
         .from("contests")
         .select("*")
-        .eq("status", "upcoming")
-        .gt("start_time", now) // Only get contests that haven't started yet
+        .in("status", ["upcoming", "waiting_for_players"]) // Allow both statuses
+        .gt("end_time", now) // Only get contests that haven't ended
         .order("start_time", { ascending: true });
 
       if (error) throw error;
@@ -70,16 +70,16 @@ export const AvailableContests = () => {
   // Filter contests based on our criteria
   const availableContests = contests?.filter(contest => {
     const now = new Date();
-    const startTime = new Date(contest.start_time);
+    const endTime = new Date(contest.end_time);
     const isJoined = joinedContests?.includes(contest.id) || false;
     const isFull = contest.current_participants >= contest.max_participants;
     
     // Show contests that:
     // 1. Haven't been joined by the user
-    // 2. Haven't started yet (double check even though we filtered in the query)
+    // 2. Haven't ended yet
     // 3. Aren't full
     return !isJoined && 
-           startTime > now && 
+           endTime > now && 
            !isFull;
   }) || [];
 
