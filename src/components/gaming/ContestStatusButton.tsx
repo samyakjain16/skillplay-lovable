@@ -94,10 +94,12 @@ export const ContestStatusButton = ({
       (contest.status === 'waiting_for_players' || contest.status === 'upcoming');
 
     const now = new Date();
+    const startTime = contest.start_time ? new Date(contest.start_time) : null;
     const endTime = contest.end_time ? new Date(contest.end_time) : null;
     const hasEnded = endTime && now > endTime;
 
-    if (isWaitingForPlayers) {
+    // Determine button state based on contest status
+    if (contest.status === 'waiting_for_players' || isWaitingForPlayers) {
       buttonState.text = `Waiting for Players (${contest.current_participants}/${contest.max_participants})`;
       buttonState.disabled = true;
       buttonState.customClass = "bg-gray-400 text-white cursor-not-allowed";
@@ -112,7 +114,7 @@ export const ContestStatusButton = ({
     } else if (contest.status === "in_progress") {
       buttonState.text = "Continue Playing";
       buttonState.customClass = "bg-blue-500 hover:bg-blue-600 text-white";
-    } else if (!contest.start_time || new Date() < new Date(contest.start_time)) {
+    } else if (startTime && now < startTime && contest.contest_type !== 'fixed_participants') {
       buttonState.text = "Starting Soon";
       buttonState.disabled = true;
       buttonState.customClass = "bg-gray-400 text-white cursor-not-allowed";
