@@ -1,5 +1,6 @@
 
 import { Loader2 } from "lucide-react";
+import { useNavigate } from "react-router-dom"; // Add this import
 import { useAuth } from "@/hooks/useAuth";
 import { useGameProgress } from "./hooks/useGameProgress";
 import { useContestAndGames } from "./hooks/useContestAndGames";
@@ -28,6 +29,7 @@ export const GameContainer = ({
   onGameComplete,
   initialProgress 
 }: GameContainerProps) => {
+  const navigate = useNavigate(); // Add this line
   const { user } = useAuth();
   const { data: completedGamesCount, refetch: refetchCompletedGames } = useGameProgress(contestId);
   const { contest, contestGames, isLoading } = useContestAndGames(contestId);
