@@ -11,6 +11,8 @@ interface ContestDetailsProps {
   prizeDistributionType: string;
   seriesCount: number;
   startTime: string;
+  contestType: string;
+  entryFee: number;
 }
 
 export const ContestDetails = ({
@@ -20,6 +22,8 @@ export const ContestDetails = ({
   prizeDistributionType,
   seriesCount,
   startTime,
+  contestType,
+  entryFee
 }: ContestDetailsProps) => {
   const { data: distributionModels } = useQuery({
     queryKey: ["prize-distribution-models"],
@@ -31,10 +35,14 @@ export const ContestDetails = ({
     const model = distributionModels.get(prizeDistributionType);
     if (!model) return null;
 
+    const actualPrizePool = contestType === 'fixed_participants' 
+      ? maxParticipants * entryFee * 0.9 
+      : totalPrizePool;
+
     const breakdown = [];
     // Parse the distribution rules and calculate prize amounts
     Object.entries(model.distribution_rules).forEach(([position, percentage]) => {
-      const amount = (totalPrizePool * percentage) / 100;
+      const amount = (actualPrizePool * percentage) / 100;
       breakdown.push({ position: parseInt(position), amount });
     });
 
@@ -58,7 +66,9 @@ export const ContestDetails = ({
           <Trophy className="h-4 w-4 text-primary" />
           <span>Prize Pool</span>
         </div>
-        <span>${totalPrizePool}</span>
+        <span>${contestType === 'fixed_participants' 
+          ? (maxParticipants * entryFee * 0.9).toFixed(2) 
+          : totalPrizePool.toFixed(2)}</span>
       </div>
 
       {prizeBreakdown && (
@@ -84,13 +94,15 @@ export const ContestDetails = ({
         <span>{seriesCount} Games</span>
       </div>
 
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Clock className="h-4 w-4 text-primary" />
-          <span>Starts in</span>
+      {contestType !== 'fixed_participants' && (
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Clock className="h-4 w-4 text-primary" />
+            <span>Starts in</span>
+          </div>
+          <CountdownTimer targetDate={new Date(startTime)} />
         </div>
-        <CountdownTimer targetDate={new Date(startTime)} />
-      </div>
+      )}
     </div>
   );
 };

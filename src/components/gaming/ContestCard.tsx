@@ -20,7 +20,7 @@ interface Contest {
 }
 
 interface ContestCardProps {
-  contest: Contest;
+  contest: Contest & { contest_type: string };
   onStart?: (contestId: string) => void;
   isStarting?: boolean;
   onJoin?: (contestId: string) => void;
@@ -61,8 +61,17 @@ export const ContestCard = ({
 
     // For contests in "My Contests"
     if (isInMyContests) {
+      // If fixed_participants contest is waiting for players
+      if (contest.contest_type === 'fixed_participants' && contest.status === 'waiting_for_players') {
+        toast({
+          title: "Waiting for Players",
+          description: `Contest will begin when ${contest.max_participants} players have joined.`,
+        });
+        return;
+      }
+
       // Contest hasn't started yet
-      if (now < startTime) {
+      if (now < startTime && contest.contest_type !== 'fixed_participants') {
         toast({
           title: "Contest Not Started",
           description: `Contest will begin at ${startTime.toLocaleTimeString()} on ${startTime.toLocaleDateString()}`,
@@ -80,7 +89,7 @@ export const ContestCard = ({
       }
 
       // Contest is active and user hasn't completed games
-      if (now >= startTime && now <= endTime && !userCompletedGames) {
+      if ((now >= startTime && now <= endTime) || contest.status === 'in_progress') {
         onStart?.(contest.id);
         return;
       }
@@ -99,7 +108,7 @@ export const ContestCard = ({
       }
 
       // Contest hasn't started yet - allow joining
-      if (now < startTime) {
+      if (contest.contest_type === 'fixed_participants' || now < startTime) {
         onJoin?.(contest.id);
         return;
       }
@@ -153,6 +162,8 @@ export const ContestCard = ({
             prizeDistributionType={contest.prize_distribution_type}
             seriesCount={contest.series_count}
             startTime={contest.start_time}
+            contestType={contest.contest_type}
+            entryFee={contest.entry_fee}
           />
 
           <div className="pt-4">

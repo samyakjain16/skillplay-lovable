@@ -15,6 +15,7 @@ interface ContestStatusButtonProps {
     current_participants: number;
     max_participants: number;
     series_count: number;
+    contest_type: string;
   };
   onClick?: () => void;
   loading?: boolean;
@@ -80,7 +81,45 @@ export const ContestStatusButton = ({
     };
   }, [contest.status, contest.id, contest.start_time, contest.end_time, queryClient]);
 
-  const buttonState = getContestState(contest, isInMyContests, userCompletedGames);
+  let buttonText = "Join Contest";
+  if (contest.contest_type === 'fixed_participants') {
+    buttonText = `Join (${contest.current_participants}/${contest.max_participants})`;
+  }
+
+  const buttonState = {
+    text: buttonText,
+    variant: "default" as const,
+    disabled: false,
+    showProgress: contest.status === "in_progress",
+    customClass: "bg-green-500 hover:bg-green-600 text-white"
+  };
+
+  // Modify button state based on contest conditions
+  if (contest.status === "completed") {
+    buttonState.text = "View Leaderboard";
+    buttonState.variant = "secondary";
+    buttonState.customClass = "bg-gray-600 hover:bg-gray-700 text-white";
+  } else if (isInMyContests) {
+    if (contest.status === "waiting_for_players") {
+      buttonState.text = "Waiting for Players";
+      buttonState.disabled = true;
+      buttonState.customClass = "bg-gray-400 text-white cursor-not-allowed";
+    } else if (userCompletedGames) {
+      buttonState.text = "Games Completed";
+      buttonState.disabled = true;
+      buttonState.customClass = "bg-blue-600 text-white";
+    } else if (contest.status === "in_progress") {
+      buttonState.text = "Continue Playing";
+      buttonState.customClass = "bg-blue-500 hover:bg-blue-600 text-white";
+    }
+  } else {
+    if (contest.current_participants >= contest.max_participants) {
+      buttonState.text = "Contest Full";
+      buttonState.variant = "secondary";
+      buttonState.disabled = true;
+      buttonState.customClass = "bg-gray-600 text-white";
+    }
+  }
 
   return (
     <div className="relative w-full">
