@@ -33,7 +33,7 @@ export const ContestCard = ({
     contest.contest_type === 'fixed_participants' && 
     contest.current_participants < contest.max_participants;
 
-  const handleContestAction = () => {
+  const handleContestAction = async () => {
     // For contests in "Available Contests"
     if (!isInMyContests) {
       // Check if contest is full
@@ -46,8 +46,18 @@ export const ContestCard = ({
         return;
       }
 
+      // Prevent multiple clicks while joining
+      if (isJoining) {
+        return;
+      }
+
       // Allow joining for any valid contest
-      onJoin?.(contest.id);
+      try {
+        await onJoin?.(contest.id);
+      } catch (error) {
+        // Error handling is now done in the useJoinContest hook
+        return;
+      }
       return;
     }
 
@@ -91,7 +101,7 @@ export const ContestCard = ({
             ? 'cursor-wait' 
             : 'cursor-pointer'
       }`}
-      onClick={isWaitingForPlayers && isInMyContests ? undefined : handleContestAction}
+      onClick={handleContestAction}
     >
       <CardContent className="p-6">
         <div className="space-y-4">
