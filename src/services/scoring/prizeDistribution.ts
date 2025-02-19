@@ -27,13 +27,20 @@ export async function getPrizeDistributionModels() {
 
   // Transform database models to application models
   distributionModelsCache = new Map(
-    (models as DatabasePrizeModel[]).map(model => [
-      model.name,
-      {
-        ...model,
-        distribution_rules: JSON.parse(model.distribution_rules)
-      }
-    ])
+    (models as DatabasePrizeModel[]).map(model => {
+      // Handle both string and JSONB types from database
+      const rules = typeof model.distribution_rules === 'string' 
+        ? JSON.parse(model.distribution_rules)
+        : model.distribution_rules;
+
+      return [
+        model.name,
+        {
+          ...model,
+          distribution_rules: rules
+        }
+      ];
+    })
   );
   lastCacheUpdate = now;
 
@@ -49,6 +56,8 @@ export async function calculatePrizeDistribution(
   const model = models.get(distributionType);
 
   if (!model) {
+    console.error('Distribution type not found:', distributionType);
+    console.log('Available models:', Array.from(models.keys()));
     throw new Error(`No prize distribution model found for type: ${distributionType}`);
   }
 
