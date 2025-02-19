@@ -19,46 +19,12 @@ type JoinContestFunction = {
 export const useJoinContest = (user: User | null) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const joinInProgress = false;
 
   return useMutation({
     mutationFn: async (contestId: string) => {
       if (!user?.id) throw new Error("User not authenticated");
 
-      // First check if user has already joined
-      const { data: existingParticipation, error: checkError } = await supabase
-        .from("user_contests")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("contest_id", contestId)
-        .single();
-
-      if (existingParticipation) {
-        throw new Error("You have already joined this contest");
-      }
-
-      if (checkError && checkError.code !== "PGRST116") { // PGRST116 means no rows returned
-        console.error("Check participation error:", checkError);
-        throw new Error("Failed to check contest participation");
-      }
-
-      // Then check if contest is full
-      const { data: contest, error: contestError } = await supabase
-        .from("contests")
-        .select("current_participants, max_participants")
-        .eq("id", contestId)
-        .single();
-
-      if (contestError) {
-        console.error("Contest fetch error:", contestError);
-        throw new Error("Failed to check contest capacity");
-      }
-
-      if (contest.current_participants >= contest.max_participants) {
-        throw new Error("Contest is full");
-      }
-
-      // If all checks pass, call the join_contest function
+      // Let the database function handle all validations
       const { data, error } = await supabase.rpc<'join_contest', JoinContestFunction>(
         'join_contest',
         {
