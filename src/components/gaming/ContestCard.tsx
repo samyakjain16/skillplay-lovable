@@ -33,7 +33,7 @@ export const ContestCard = ({
     contest.contest_type === 'fixed_participants' && 
     contest.current_participants < contest.max_participants;
 
-  const handleContestAction = () => {
+  const handleContestAction = (e: React.MouseEvent) => {
     // For contests in "Available Contests"
     if (!isInMyContests) {
       // Check if contest is full
@@ -52,21 +52,20 @@ export const ContestCard = ({
     }
 
     // For contests in "My Contests"
-    const now = new Date();
-    const endTime = contest.end_time ? new Date(contest.end_time) : null;
-
-    // If contest is completed
-    if (contest.status === 'completed') {
-      navigate(`/contest/${contest.id}/leaderboard`);
-      return;
-    }
-
-    // If fixed_participants contest is waiting for players
+    // If fixed_participants contest is waiting for players, prevent any action
     if (isWaitingForPlayers) {
+      e.preventDefault();
+      e.stopPropagation();
       toast({
         title: "Waiting for Players",
         description: `Contest will begin when ${contest.max_participants} players have joined.`,
       });
+      return;
+    }
+
+    // If contest is completed
+    if (contest.status === 'completed') {
+      navigate(`/contest/${contest.id}/leaderboard`);
       return;
     }
 
@@ -83,18 +82,21 @@ export const ContestCard = ({
     onStart?.(contest.id);
   };
   
+  // Determine if the card should be clickable
+  const isClickable = !isWaitingForPlayers || !isInMyContests;
+  
   return (
     <Card 
       className={`w-full transition-all duration-200 hover:shadow-lg ${
         contest.status === 'completed'
           ? 'cursor-pointer opacity-75'
-          : isWaitingForPlayers
-          ? 'cursor-not-allowed opacity-75'
+          : isWaitingForPlayers && isInMyContests
+          ? 'cursor-default opacity-75 pointer-events-none'
           : (isStarting || isJoining) 
             ? 'cursor-wait' 
             : 'cursor-pointer'
       }`}
-      onClick={handleContestAction}
+      onClick={isClickable ? handleContestAction : undefined}
     >
       <CardContent className="p-6">
         <div className="space-y-4">
