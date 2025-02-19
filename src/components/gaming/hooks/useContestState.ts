@@ -32,17 +32,20 @@ export const useContestState = (
       const now = new Date();
       setGameStartTime(now);
 
+      // Create a plain object for the update
+      const updateData = {
+        current_game_index: currentGameIndex,
+        current_game_start_time: now.toISOString()
+      };
+
       const { error } = await supabase
         .from('user_contests')
-        .update({ 
-          current_game_index: currentGameIndex,
-          current_game_start_time: now.toISOString()
-        })
+        .update(updateData)
         .eq('contest_id', contestId)
         .eq('user_id', user.id);
 
       if (error) {
-        console.error('Error updating game progress:', error);
+        console.error('Error updating game progress:', error.message);
         toast({
           variant: "destructive",
           title: "Error",
@@ -50,7 +53,9 @@ export const useContestState = (
         });
       }
     } catch (error) {
-      console.error('Error in updateGameProgress:', error);
+      if (error instanceof Error) {
+        console.error('Error in updateGameProgress:', error.message);
+      }
       toast({
         variant: "destructive",
         title: "Error",
