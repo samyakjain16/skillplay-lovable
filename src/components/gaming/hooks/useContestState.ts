@@ -17,7 +17,9 @@ export const useContestState = (
   const navigate = useNavigate();
   const { toast } = useToast();
   const [currentGameIndex, setCurrentGameIndex] = useState(initialProgress?.current_game_index || 0);
-  const [gameStartTime, setGameStartTime] = useState<Date | null>(null);
+  const [gameStartTime, setGameStartTime] = useState<Date | null>(
+    initialProgress?.current_game_start_time ? new Date(initialProgress.current_game_start_time) : null
+  );
   const hasRedirected = useRef(false);
 
   const getGameEndTime = (): Date | null => {
@@ -26,41 +28,72 @@ export const useContestState = (
   };
 
   const updateGameProgress = async () => {
-    if (!user) return;
+    if (!user || !contestId) {
+      console.error('Missing user or contest ID');
+      return;
+    }
     
     try {
+      // First, check if the contest is still active
+      const { data: contestData, error: contestError } = await supabase
+        .from('contests')
+        .select('status')
+        .eq('id', contestId)
+        .single();
+
+      if (contestError) {
+        throw new Error('Failed to check contest status');
+      }
+
+      if (contestData.status === 'completed') {
+        navigate(`/contest/${contestId}/leaderboard`);
+        return;
+      }
+
       const now = new Date();
       setGameStartTime(now);
 
-      // Create a plain object for the update
+      // Check if user is still part of the contest
+      const { data: userContest, error: userContestError } = await supabase
+        .from('user_contests')
+        .select('status')
+        .eq('contest_id', contestId)
+        .eq('user_id', user.id)
+        .single();
+
+      if (userContestError) {
+        throw new Error('Failed to check user contest status');
+      }
+
+      if (userContest.status === 'completed') {
+        navigate('/gaming');
+        return;
+      }
+
       const updateData = {
         current_game_index: currentGameIndex,
-        current_game_start_time: now.toISOString()
+        current_game_start_time: now.toISOString(),
+        status: 'active'
       };
 
-      const { error } = await supabase
+      const { error: updateError } = await supabase
         .from('user_contests')
         .update(updateData)
         .eq('contest_id', contestId)
         .eq('user_id', user.id);
 
-      if (error) {
-        console.error('Error updating game progress:', error.message);
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Failed to update game progress. Please try again.",
-        });
+      if (updateError) {
+        throw new Error(updateError.message);
       }
+
     } catch (error) {
-      if (error instanceof Error) {
-        console.error('Error in updateGameProgress:', error.message);
-      }
+      console.error('Error in updateGameProgress:', error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "An unexpected error occurred.",
+        description: "Failed to update game progress. Please refresh and try again.",
       });
+      navigate('/gaming');
     }
   };
 
