@@ -74,7 +74,7 @@ export const ContestStatusButton = ({
   }, [contest.status, contest.id, contest.start_time, contest.end_time, queryClient]);
 
   let buttonText = "Join Contest";
-  if (contest.contest_type === 'fixed_participants') {
+  if (!isInMyContests && contest.contest_type === 'fixed_participants') {
     buttonText = `Join (${contest.current_participants}/${contest.max_participants})`;
   }
 
@@ -92,7 +92,7 @@ export const ContestStatusButton = ({
     buttonState.variant = "default";
     buttonState.customClass = "bg-gray-600 hover:bg-gray-700 text-white";
   } else if (isInMyContests) {
-    if (contest.status === "waiting_for_players") {
+    if (contest.contest_type === 'fixed_participants' && contest.current_participants < contest.max_participants) {
       buttonState.text = "Waiting for Players";
       buttonState.disabled = true;
       buttonState.customClass = "bg-gray-400 text-white cursor-not-allowed";
