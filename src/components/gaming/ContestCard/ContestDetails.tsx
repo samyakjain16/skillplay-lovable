@@ -1,5 +1,5 @@
 
-import { Trophy, Users, Clock, Award, Hash } from "lucide-react";
+import { Trophy, Users, Clock, Award, Hash, CircleDollarSign } from "lucide-react";
 import { CountdownTimer } from "../CountdownTimer";
 import { useQuery } from "@tanstack/react-query";
 import { getPrizeDistributionModels } from "@/services/scoring/prizeDistribution";
@@ -69,6 +69,14 @@ export const ContestDetails = ({
         <span>${contestType === 'fixed_participants' 
           ? (maxParticipants * entryFee * 0.9).toFixed(2) 
           : totalPrizePool.toFixed(2)}</span>
+      </div>
+
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <CircleDollarSign className="h-4 w-4 text-primary" />
+          <span>Entry</span>
+        </div>
+        <span>${entryFee}</span>
       </div>
 
       {prizeBreakdown && (
