@@ -56,16 +56,27 @@ export const useContestRealtime = () => {
           
           if (!newContest?.id) return;
 
+          // If contest has ended (either by status change or current time > end_time)
+          const now = new Date();
+          const endTime = new Date(newContest.end_time);
+          const hasEnded = now > endTime || newContest.status === 'completed';
+
+          // Force contest status to completed if end time has passed
+          const finalContest = {
+            ...newContest,
+            status: hasEnded ? 'completed' : newContest.status
+          };
+
           // Update my-contests query data
           queryClient.setQueryData<MyContestParticipation[] | undefined>(
             ['my-contests'], 
             (oldData) => {
               if (!oldData) return oldData;
               return oldData.map((participation) => {
-                if (participation.contest.id === newContest.id) {
+                if (participation.contest.id === finalContest.id) {
                   return {
                     ...participation,
-                    contest: { ...participation.contest, ...newContest }
+                    contest: { ...participation.contest, ...finalContest }
                   };
                 }
                 return participation;
@@ -79,26 +90,26 @@ export const useContestRealtime = () => {
             (oldData) => {
               if (!oldData) return oldData;
               return oldData.map((contest) => {
-                if (contest.id === newContest.id) {
-                  return { ...contest, ...newContest };
+                if (contest.id === finalContest.id) {
+                  return { ...contest, ...finalContest };
                 }
                 return contest;
               });
             }
           );
 
-          // Force refetch if status changed
-          if (oldContest && 'status' in oldContest && oldContest.status !== newContest.status) {
+          // If contest has ended or status changed, force refetch
+          if (hasEnded || (oldContest && oldContest.status !== finalContest.status)) {
             queryClient.invalidateQueries({ queryKey: ["my-contests"] });
             queryClient.invalidateQueries({ queryKey: ["available-contests"] });
           }
 
           // Update single contest query if it exists
           queryClient.setQueryData(
-            ['contest', newContest.id],
+            ['contest', finalContest.id],
             (oldData: any) => {
               if (!oldData) return oldData;
-              return { ...oldData, ...newContest };
+              return { ...oldData, ...finalContest };
             }
           );
         }

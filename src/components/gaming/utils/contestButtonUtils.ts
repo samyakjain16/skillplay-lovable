@@ -22,12 +22,13 @@ export const getTimeStatus = (startTime: string, endTime: string): TimeStatus =>
   const totalDuration = end.getTime() - start.getTime();
   const elapsed = now.getTime() - start.getTime();
   const currentGameIndex = Math.floor(elapsed / 30000); // 30 seconds per game
+  const hasEnded = now > end;
   
   return {
     hasStarted: now >= start,
-    hasEnded: now > end,
+    hasEnded,
     progress: Math.min(Math.max((elapsed / totalDuration) * 100, 0), 100),
-    currentGameIndex,
+    currentGameIndex: hasEnded ? 0 : currentGameIndex,
     remainingTime: end.getTime() - now.getTime()
   };
 };
@@ -50,7 +51,7 @@ export const getContestState = (
   );
   const isContestFull = contest.current_participants >= contest.max_participants;
 
-  // For completed contests
+  // For completed contests or if the contest has ended
   if (hasEnded || contest.status === "completed") {
     return {
       text: "View Leaderboard",
