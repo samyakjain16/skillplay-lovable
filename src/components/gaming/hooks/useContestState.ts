@@ -28,11 +28,11 @@ export const useContestState = (
   const updateGameProgress = async () => {
     if (!user) return;
     
-    const now = new Date();
-    setGameStartTime(now);
-
     try {
-      await supabase
+      const now = new Date();
+      setGameStartTime(now);
+
+      const { error } = await supabase
         .from('user_contests')
         .update({ 
           current_game_index: currentGameIndex,
@@ -40,8 +40,22 @@ export const useContestState = (
         })
         .eq('contest_id', contestId)
         .eq('user_id', user.id);
+
+      if (error) {
+        console.error('Error updating game progress:', error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to update game progress. Please try again.",
+        });
+      }
     } catch (error) {
-      console.error('Error updating game progress:', error);
+      console.error('Error in updateGameProgress:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "An unexpected error occurred.",
+      });
     }
   };
 
