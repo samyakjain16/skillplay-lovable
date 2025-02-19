@@ -22,6 +22,7 @@ export const useContestState = (
   );
   const hasRedirected = useRef(false);
   const updateInProgress = useRef(false);
+  const gameEndInProgress = useRef(false);
 
   const getGameEndTime = (): Date | null => {
     if (!gameStartTime) return null;
@@ -29,7 +30,7 @@ export const useContestState = (
   };
 
   const updateGameProgress = async () => {
-    if (!user || !contestId || updateInProgress.current) {
+    if (!user || !contestId || updateInProgress.current || gameEndInProgress.current) {
       return;
     }
 
@@ -43,7 +44,8 @@ export const useContestState = (
         .select(`
           status,
           user_contests!inner (
-            status
+            status,
+            current_game_index
           )
         `)
         .eq('id', contestId)
@@ -70,10 +72,12 @@ export const useContestState = (
         return;
       }
 
+      // Set the current game index from the database to ensure consistency
+      setCurrentGameIndex(data.user_contests[0].current_game_index);
       setGameStartTime(now);
 
       const updateData = {
-        current_game_index: currentGameIndex,
+        current_game_index: data.user_contests[0].current_game_index,
         current_game_start_time: now.toISOString(),
         status: 'active'
       };
@@ -102,6 +106,7 @@ export const useContestState = (
     getGameEndTime,
     updateGameProgress,
     navigate,
-    toast
+    toast,
+    gameEndInProgress
   };
 };

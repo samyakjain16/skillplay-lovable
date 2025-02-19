@@ -1,6 +1,6 @@
 
 import { Loader2 } from "lucide-react";
-import { useNavigate } from "react-router-dom"; // Add this import
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useGameProgress } from "./hooks/useGameProgress";
 import { useContestAndGames } from "./hooks/useContestAndGames";
@@ -29,7 +29,7 @@ export const GameContainer = ({
   onGameComplete,
   initialProgress 
 }: GameContainerProps) => {
-  const navigate = useNavigate(); // Add this line
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { data: completedGamesCount, refetch: refetchCompletedGames } = useGameProgress(contestId);
   const { contest, contestGames, isLoading } = useContestAndGames(contestId);
@@ -41,12 +41,14 @@ export const GameContainer = ({
     hasRedirected,
     getGameEndTime,
     updateGameProgress,
-    toast
+    toast,
+    gameEndInProgress
   } = useContestState(contestId, user, initialProgress);
 
   const handleGameEnd = async (score: number) => {
-    if (!user || !contestGames) return;
+    if (!user || !contestGames || gameEndInProgress.current) return;
 
+    gameEndInProgress.current = true;
     const currentGame = contestGames[currentGameIndex];
     const timeSpent = gameStartTime ? Math.floor((Date.now() - gameStartTime.getTime()) / 1000) : 30;
     const isFinalGame = currentGameIndex === contestGames.length - 1;
@@ -56,10 +58,22 @@ export const GameContainer = ({
       // Calculate new total score by adding current game score
       const { data: currentUserContest } = await supabase
         .from('user_contests')
-        .select('score')
+        .select('score, current_game_index')
         .eq('contest_id', contestId)
         .eq('user_id', user.id)
         .single();
+
+      // If the current game index in the database is ahead of our local state,
+      // it means this game was already completed (possibly by the timer)
+      if (currentUserContest && currentUserContest.current_game_index > currentGameIndex) {
+        console.log("Game already completed, moving to next game");
+        if (!isFinalGame) {
+          setCurrentGameIndex(currentUserContest.current_game_index);
+          updateGameProgress();
+        }
+        gameEndInProgress.current = false;
+        return;
+      }
 
       const previousScore = currentUserContest?.score || 0;
       const newTotalScore = previousScore + score;
@@ -106,6 +120,7 @@ export const GameContainer = ({
             setCurrentGameIndex(prev => prev + 1);
             updateGameProgress();
           }
+          gameEndInProgress.current = false;
           return;
         }
         throw progressError;
@@ -116,7 +131,6 @@ export const GameContainer = ({
       
       if (!isFinalGame) {
         setCurrentGameIndex(prev => prev + 1);
-        // New game will start with fresh timer in the initialization effect
       }
 
     } catch (error) {
@@ -126,6 +140,8 @@ export const GameContainer = ({
         title: "Error",
         description: "An error occurred while saving your progress.",
       });
+    } finally {
+      gameEndInProgress.current = false;
     }
   };
 
