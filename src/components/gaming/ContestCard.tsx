@@ -29,7 +29,20 @@ export const ContestCard = ({
   const { toast } = useToast();
   const navigate = useNavigate();
   
+  const isWaitingForPlayers = isInMyContests && 
+    contest.contest_type === 'fixed_participants' && 
+    contest.current_participants < contest.max_participants;
+
   const handleContestAction = () => {
+    // If waiting for players, don't allow any action
+    if (isWaitingForPlayers) {
+      toast({
+        title: "Waiting for Players",
+        description: `Contest will begin when ${contest.max_participants} players have joined.`,
+      });
+      return;
+    }
+
     const now = new Date();
     const startTime = new Date(contest.start_time);
     const endTime = new Date(contest.end_time);
@@ -125,11 +138,13 @@ export const ContestCard = ({
       className={`w-full transition-all duration-200 hover:shadow-lg ${
         contest.status === 'completed' || new Date() > new Date(contest.end_time)
           ? 'cursor-pointer opacity-75'
+          : isWaitingForPlayers
+          ? 'cursor-not-allowed opacity-75'
           : (isStarting || isJoining) 
             ? 'cursor-wait' 
             : 'cursor-pointer'
       }`}
-      onClick={handleContestAction}
+      onClick={isWaitingForPlayers ? undefined : handleContestAction}
     >
       <CardContent className="p-6">
         <div className="space-y-4">
@@ -138,6 +153,11 @@ export const ContestCard = ({
             {contest.status === 'completed' && (
               <span className="text-sm text-muted-foreground">
                 Contest completed - View leaderboard
+              </span>
+            )}
+            {isWaitingForPlayers && (
+              <span className="text-sm text-muted-foreground">
+                Waiting for more players to join
               </span>
             )}
           </div>
