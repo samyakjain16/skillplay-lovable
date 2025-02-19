@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,7 +7,7 @@ interface ArrangeSortGameProps {
     items: string[];
     correctOrder: number[];
   };
-  onComplete: (score: number) => void;
+  onComplete: (isCorrect: boolean, timeTaken: number) => Promise<void>;
 }
 
 export const ArrangeSortGame = ({ content, onComplete }: ArrangeSortGameProps) => {
@@ -24,8 +23,8 @@ export const ArrangeSortGame = ({ content, onComplete }: ArrangeSortGameProps) =
   const handleSubmit = () => {
     const score = items.every((item, index) => 
       content.items[content.correctOrder[index]] === item
-    ) ? 100 : 0;
-    onComplete(score);
+    );
+    onComplete(score, 0);
   };
 
   return (

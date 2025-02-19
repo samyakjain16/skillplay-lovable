@@ -1,6 +1,6 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { PrizeDistributionModel } from "./types";
+import { PrizeDistributionModel, DatabasePrizeModel } from "./types";
 
 // In-memory cache
 let distributionModelsCache: Map<string, PrizeDistributionModel> | null = null;
@@ -10,12 +10,10 @@ let lastCacheUpdate = 0;
 export async function getPrizeDistributionModels() {
   const now = Date.now();
   
-  // Return cached models if they're still valid
   if (distributionModelsCache && (now - lastCacheUpdate) < CACHE_DURATION) {
     return distributionModelsCache;
   }
 
-  // Fetch fresh models from database
   const { data: models, error } = await supabase
     .from('prize_distribution_models')
     .select('*')
@@ -23,14 +21,19 @@ export async function getPrizeDistributionModels() {
 
   if (error) {
     console.error('Error fetching prize distribution models:', error);
-    // Fall back to cache if available, otherwise throw
     if (distributionModelsCache) return distributionModelsCache;
     throw error;
   }
 
-  // Update cache
+  // Transform database models to application models
   distributionModelsCache = new Map(
-    models.map(model => [model.name, model])
+    (models as DatabasePrizeModel[]).map(model => [
+      model.name,
+      {
+        ...model,
+        distribution_rules: JSON.parse(model.distribution_rules)
+      }
+    ])
   );
   lastCacheUpdate = now;
 

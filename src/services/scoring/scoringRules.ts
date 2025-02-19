@@ -1,6 +1,6 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { ScoringRule, SpeedBonusRule } from "./types";
+import { ScoringRule, SpeedBonusRule, DatabaseScoringRule } from "./types";
 
 // In-memory cache
 let scoringRulesCache: Map<string, ScoringRule> | null = null;
@@ -24,14 +24,19 @@ export async function getScoringRules() {
 
   if (error) {
     console.error('Error fetching scoring rules:', error);
-    // Fall back to cache if available, otherwise throw
     if (scoringRulesCache) return scoringRulesCache;
     throw error;
   }
 
-  // Update cache
+  // Transform database rules to application rules
   scoringRulesCache = new Map(
-    rules.map(rule => [rule.game_category, rule])
+    (rules as DatabaseScoringRule[]).map(rule => [
+      rule.game_category, 
+      {
+        ...rule,
+        conditions: rule.conditions ? JSON.parse(rule.conditions) : null
+      }
+    ])
   );
   lastCacheUpdate = now;
 

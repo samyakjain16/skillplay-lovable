@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -9,7 +8,7 @@ interface SpotDifferenceGameProps {
     image2: string;
     differences: { x: number; y: number; radius: number }[];
   };
-  onComplete: (score: number) => void;
+  onComplete: (isCorrect: boolean, timeTaken: number, data?: Record<string, any>) => Promise<void>;
 }
 
 export const SpotDifferenceGame = ({ content, onComplete }: SpotDifferenceGameProps) => {
@@ -37,7 +36,7 @@ export const SpotDifferenceGame = ({ content, onComplete }: SpotDifferenceGamePr
 
   const handleSubmit = () => {
     const score = Math.round((foundDifferences.length / content.differences.length) * 100);
-    onComplete(score);
+    onComplete(true, 0, { score });
   };
 
   return (

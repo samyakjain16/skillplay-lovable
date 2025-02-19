@@ -23,3 +23,11 @@ export interface PrizeDistributionModel {
   max_participants: number;
   is_active: boolean;
 }
+
+export type DatabaseScoringRule = Omit<ScoringRule, 'conditions'> & {
+  conditions: string | null;
+};
+
+export type DatabasePrizeModel = Omit<PrizeDistributionModel, 'distribution_rules'> & {
+  distribution_rules: string;
+};

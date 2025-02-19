@@ -11,7 +11,7 @@ interface TriviaGameProps {
     options: string[];
     correctAnswer: number;
   };
-  onComplete: (isCorrect: boolean, timeTaken: number) => void;
+  onComplete: (isCorrect: boolean, timeTaken: number) => Promise<void>;
 }
 
 export const TriviaGame = ({ content, onComplete }: TriviaGameProps) => {
