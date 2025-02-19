@@ -32,7 +32,7 @@ export const ContestCard = ({
   const isWaitingForPlayers = 
     contest.contest_type === 'fixed_participants' && 
     contest.current_participants < contest.max_participants &&
-    contest.status === 'waiting_for_players';
+    (contest.status === 'waiting_for_players' || contest.status === 'upcoming');
 
   const handleContestAction = () => {
     // For contests in "Available Contests"
@@ -43,6 +43,18 @@ export const ContestCard = ({
           variant: "destructive",
           title: "Contest Full",
           description: "This contest has reached its maximum number of participants.",
+        });
+        return;
+      }
+
+      // Check if contest has ended
+      const now = new Date();
+      const endTime = contest.end_time ? new Date(contest.end_time) : null;
+      if (endTime && now > endTime) {
+        toast({
+          variant: "destructive",
+          title: "Contest Ended",
+          description: "This contest has already ended.",
         });
         return;
       }
@@ -74,9 +86,14 @@ export const ContestCard = ({
 
     // Contest hasn't started yet
     if (startTime && now < startTime && contest.contest_type !== 'fixed_participants') {
+      const timeUntilStart = startTime.getTime() - now.getTime();
+      const minutesUntilStart = Math.ceil(timeUntilStart / (1000 * 60));
+      
       toast({
         title: "Contest Not Started",
-        description: `Contest will begin at ${startTime.toLocaleTimeString()} on ${startTime.toLocaleDateString()}`,
+        description: minutesUntilStart <= 60 
+          ? `Contest will begin in ${minutesUntilStart} minute${minutesUntilStart === 1 ? '' : 's'}`
+          : `Contest will begin at ${startTime.toLocaleTimeString()} on ${startTime.toLocaleDateString()}`,
       });
       return;
     }
@@ -108,7 +125,7 @@ export const ContestCard = ({
             ? 'cursor-wait' 
             : 'cursor-pointer'
       }`}
-      onClick={isWaitingForPlayers ? undefined : handleContestAction}
+      onClick={handleContestAction}
     >
       <CardContent className="p-6">
         <div className="space-y-4">
@@ -121,7 +138,7 @@ export const ContestCard = ({
             )}
             {isWaitingForPlayers && (
               <span className="text-sm text-muted-foreground">
-                Waiting for more players to join
+                Waiting for more players to join ({contest.current_participants}/{contest.max_participants})
               </span>
             )}
           </div>
