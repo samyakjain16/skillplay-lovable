@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
@@ -6,21 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { ContestCard } from "./ContestCard";
 import { useContestRealtime } from "@/hooks/useContestRealtime";
 import { useNavigate } from "react-router-dom";
-
-type Contest = {
-  id: string;
-  title: string;
-  description: string;
-  series_count: number;
-  max_participants: number;
-  current_participants: number;
-  status: string;
-  start_time: string;
-  end_time: string;
-  prize_pool: number;
-  entry_fee: number;
-  prize_distribution_type: string;
-};
+import { type Contest } from "./ContestTypes";
 
 type Participation = {
   id: string;

@@ -3,20 +3,12 @@ import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { getTimeStatus, getContestState } from "./utils/contestButtonUtils";
+import { getTimeStatus } from "./utils/contestButtonUtils";
 import { ContestProgressBar } from "./ContestProgressBar";
+import { type Contest } from "./ContestTypes";
 
 interface ContestStatusButtonProps {
-  contest: {
-    id: string;
-    status: string;
-    start_time: string;
-    end_time: string;
-    current_participants: number;
-    max_participants: number;
-    series_count: number;
-    contest_type: string;
-  };
+  contest: Pick<Contest, "id" | "status" | "start_time" | "end_time" | "current_participants" | "max_participants" | "series_count" | "contest_type">;
   onClick?: () => void;
   loading?: boolean;
   isInMyContests?: boolean;
@@ -97,7 +89,7 @@ export const ContestStatusButton = ({
   // Modify button state based on contest conditions
   if (contest.status === "completed") {
     buttonState.text = "View Leaderboard";
-    buttonState.variant = "secondary";
+    buttonState.variant = "default";
     buttonState.customClass = "bg-gray-600 hover:bg-gray-700 text-white";
   } else if (isInMyContests) {
     if (contest.status === "waiting_for_players") {
@@ -115,7 +107,7 @@ export const ContestStatusButton = ({
   } else {
     if (contest.current_participants >= contest.max_participants) {
       buttonState.text = "Contest Full";
-      buttonState.variant = "secondary";
+      buttonState.variant = "default";
       buttonState.disabled = true;
       buttonState.customClass = "bg-gray-600 text-white";
     }
