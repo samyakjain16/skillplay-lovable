@@ -54,7 +54,7 @@ export type Database = {
           created_at: string | null
           current_participants: number | null
           description: string | null
-          end_time: string
+          end_time: string | null
           entry_fee: number
           id: string
           max_participants: number | null
@@ -62,7 +62,7 @@ export type Database = {
           prize_distribution_type: string
           prize_pool: number
           series_count: number
-          start_time: string
+          start_time: string | null
           status: string | null
           title: string
           updated_at: string | null
@@ -72,7 +72,7 @@ export type Database = {
           created_at?: string | null
           current_participants?: number | null
           description?: string | null
-          end_time: string
+          end_time?: string | null
           entry_fee?: number
           id?: string
           max_participants?: number | null
@@ -80,7 +80,7 @@ export type Database = {
           prize_distribution_type?: string
           prize_pool?: number
           series_count?: number
-          start_time: string
+          start_time?: string | null
           status?: string | null
           title: string
           updated_at?: string | null
@@ -90,7 +90,7 @@ export type Database = {
           created_at?: string | null
           current_participants?: number | null
           description?: string | null
-          end_time?: string
+          end_time?: string | null
           entry_fee?: number
           id?: string
           max_participants?: number | null
@@ -98,7 +98,7 @@ export type Database = {
           prize_distribution_type?: string
           prize_pool?: number
           series_count?: number
-          start_time?: string
+          start_time?: string | null
           status?: string | null
           title?: string
           updated_at?: string | null
