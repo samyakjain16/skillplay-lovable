@@ -43,58 +43,6 @@ export const ContestCard = ({
       return;
     }
 
-    const now = new Date();
-    const startTime = new Date(contest.start_time);
-    const endTime = new Date(contest.end_time);
-    
-    // If contest is completed, navigate to leaderboard
-    if (contest.status === 'completed') {
-      navigate(`/contest/${contest.id}/leaderboard`);
-      return;
-    }
-
-    // If contest has ended by time
-    if (now > endTime) {
-      navigate(`/contest/${contest.id}/leaderboard`);
-      return;
-    }
-
-    // For contests in "My Contests"
-    if (isInMyContests) {
-      // If fixed_participants contest is waiting for players
-      if (contest.contest_type === 'fixed_participants' && contest.status === 'waiting_for_players') {
-        toast({
-          title: "Waiting for Players",
-          description: `Contest will begin when ${contest.max_participants} players have joined.`,
-        });
-        return;
-      }
-
-      // Contest hasn't started yet
-      if (now < startTime && contest.contest_type !== 'fixed_participants') {
-        toast({
-          title: "Contest Not Started",
-          description: `Contest will begin at ${startTime.toLocaleTimeString()} on ${startTime.toLocaleDateString()}`,
-        });
-        return;
-      }
-
-      // User has completed all games but contest is still running
-      if (userCompletedGames) {
-        toast({
-          title: "Games Completed",
-          description: "You've completed all games. Leaderboard will be available when the contest ends.",
-        });
-        return;
-      }
-
-      // Contest is active and user hasn't completed games
-      if ((now >= startTime && now <= endTime) || contest.status === 'in_progress') {
-        onStart?.(contest.id);
-        return;
-      }
-    }
-
     // For contests in "Available Contests"
     if (!isInMyContests) {
       // Check if contest is full
@@ -107,36 +55,66 @@ export const ContestCard = ({
         return;
       }
 
-      // Contest hasn't started yet - allow joining
-      if (contest.contest_type === 'fixed_participants' || now < startTime) {
-        onJoin?.(contest.id);
-        return;
-      }
+      // Allow joining for any valid contest
+      onJoin?.(contest.id);
+      return;
+    }
 
-      // Contest is in progress - check if enough time to participate
-      if (now >= startTime && now <= endTime) {
-        const remainingTime = endTime.getTime() - now.getTime();
-        const minimumTimeRequired = contest.series_count * 30000; // series_count * 30 seconds per game
+    // For contests in "My Contests"
+    const now = new Date();
+    const startTime = contest.start_time ? new Date(contest.start_time) : null;
+    const endTime = contest.end_time ? new Date(contest.end_time) : null;
 
-        if (remainingTime < minimumTimeRequired) {
-          toast({
-            variant: "destructive",
-            title: "Contest Ending Soon",
-            description: `Not enough time left to complete ${contest.series_count} games.`,
-          });
-          return;
-        }
+    // If contest is completed, navigate to leaderboard
+    if (contest.status === 'completed') {
+      navigate(`/contest/${contest.id}/leaderboard`);
+      return;
+    }
 
-        onJoin?.(contest.id);
-        return;
-      }
+    // If contest has ended by time
+    if (endTime && now > endTime) {
+      navigate(`/contest/${contest.id}/leaderboard`);
+      return;
+    }
+
+    // If fixed_participants contest is waiting for players
+    if (contest.contest_type === 'fixed_participants' && contest.status === 'waiting_for_players') {
+      toast({
+        title: "Waiting for Players",
+        description: `Contest will begin when ${contest.max_participants} players have joined.`,
+      });
+      return;
+    }
+
+    // Contest hasn't started yet
+    if (startTime && now < startTime && contest.contest_type !== 'fixed_participants') {
+      toast({
+        title: "Contest Not Started",
+        description: `Contest will begin at ${startTime.toLocaleTimeString()} on ${startTime.toLocaleDateString()}`,
+      });
+      return;
+    }
+
+    // User has completed all games but contest is still running
+    if (userCompletedGames) {
+      toast({
+        title: "Games Completed",
+        description: "You've completed all games. Leaderboard will be available when the contest ends.",
+      });
+      return;
+    }
+
+    // Contest is active and user hasn't completed games
+    if ((!startTime || now >= startTime) && (!endTime || now <= endTime) || contest.status === 'in_progress') {
+      onStart?.(contest.id);
+      return;
     }
   };
   
   return (
     <Card 
       className={`w-full transition-all duration-200 hover:shadow-lg ${
-        contest.status === 'completed' || new Date() > new Date(contest.end_time)
+        contest.status === 'completed' || (contest.end_time && new Date() > new Date(contest.end_time))
           ? 'cursor-pointer opacity-75'
           : isWaitingForPlayers
           ? 'cursor-not-allowed opacity-75'
