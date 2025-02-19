@@ -52,6 +52,30 @@ export async function calculatePrizeDistribution(
   totalPrizePool: number,
   distributionType: string
 ): Promise<Map<string, number>> {
+  // Check if prizes have already been calculated
+  const { data: contest, error: contestError } = await supabase
+    .from('contests')
+    .select('prize_calculation_status')
+    .eq('id', contestId)
+    .single();
+
+  if (contestError) throw contestError;
+
+  if (contest.prize_calculation_status === 'completed') {
+    console.log('Prizes already calculated for contest:', contestId);
+    // Return existing prize distribution
+    const { data: progressData } = await supabase
+      .from('player_game_progress')
+      .select('user_id, score')
+      .eq('contest_id', contestId);
+
+    const existingDistribution = new Map<string, number>();
+    progressData?.forEach(entry => {
+      existingDistribution.set(entry.user_id, entry.score);
+    });
+    return existingDistribution;
+  }
+
   const models = await getPrizeDistributionModels();
   const model = models.get(distributionType);
 
@@ -83,6 +107,9 @@ export async function calculatePrizeDistribution(
     }
   });
 
+  // After calculating prizes, distribute them and update status
+  await distributePrizes(contestId, prizeDistribution);
+
   return prizeDistribution;
 }
 
@@ -90,66 +117,74 @@ export async function distributePrizes(
   contestId: string,
   prizeDistribution: Map<string, number>
 ): Promise<void> {
-  const { data: contest, error: contestError } = await supabase
-    .from('contests')
-    .select('*')
-    .eq('id', contestId)
-    .single();
-
-  if (contestError) throw contestError;
-  if (contest.prize_calculation_status === 'completed') return;
-
-  // Start a transaction using the Supabase client
+  // Start transaction using supabase client
   const client = supabase;
 
-  // Update each winner's wallet balance and create transaction records
-  for (const [userId, prizeAmount] of prizeDistribution.entries()) {
-    // Get current wallet balance
-    const { data: profile } = await client
-      .from('profiles')
-      .select('wallet_balance')
-      .eq('id', userId)
-      .single();
-    
-    if (!profile) continue;
+  try {
+    // Update contest status to in_progress to prevent concurrent distributions
+    const { error: statusError } = await client
+      .from('contests')
+      .update({ prize_calculation_status: 'in_progress' })
+      .eq('id', contestId)
+      .eq('prize_calculation_status', 'pending');
 
-    // Update wallet balance directly
-    const { error: updateError } = await client
-      .from('profiles')
-      .update({ 
-        wallet_balance: profile.wallet_balance + prizeAmount
-      })
-      .eq('id', userId);
+    if (statusError) throw statusError;
 
-    if (updateError) {
-      console.error('Error updating wallet balance:', updateError);
-      continue;
+    // Update each winner's wallet balance and create transaction records
+    for (const [userId, prizeAmount] of prizeDistribution.entries()) {
+      // Get current wallet balance
+      const { data: profile } = await client
+        .from('profiles')
+        .select('wallet_balance')
+        .eq('id', userId)
+        .single();
+      
+      if (!profile) continue;
+
+      // Update wallet balance
+      const { error: updateError } = await client
+        .from('profiles')
+        .update({ 
+          wallet_balance: profile.wallet_balance + prizeAmount
+        })
+        .eq('id', userId);
+
+      if (updateError) {
+        console.error('Error updating wallet balance:', updateError);
+        continue;
+      }
+
+      // Create wallet transaction record
+      const { error: transactionError } = await client
+        .from('wallet_transactions')
+        .insert({
+          user_id: userId,
+          amount: prizeAmount,
+          type: 'prize_payout',
+          reference_id: contestId,
+          status: 'completed'
+        });
+
+      if (transactionError) {
+        console.error('Error creating transaction record:', transactionError);
+      }
     }
 
-    // Create wallet transaction record
-    const { error: transactionError } = await client
-      .from('wallet_transactions')
-      .insert({
-        user_id: userId,
-        amount: prizeAmount,
-        type: 'prize_payout',
-        reference_id: contestId,
-        status: 'completed'
-      });
+    // Mark prize calculation as completed
+    const { error: finalStatusError } = await client
+      .from('contests')
+      .update({ prize_calculation_status: 'completed' })
+      .eq('id', contestId);
 
-    if (transactionError) {
-      console.error('Error creating transaction record:', transactionError);
-    }
-  }
+    if (finalStatusError) throw finalStatusError;
 
-  // Update contest status
-  const { error: statusError } = await client
-    .from('contests')
-    .update({ prize_calculation_status: 'completed' })
-    .eq('id', contestId);
-
-  if (statusError) {
-    console.error('Error updating contest status:', statusError);
-    throw statusError;
+  } catch (error) {
+    console.error('Error during prize distribution:', error);
+    // Try to revert status to pending if something went wrong
+    await client
+      .from('contests')
+      .update({ prize_calculation_status: 'pending' })
+      .eq('id', contestId);
+    throw error;
   }
 }
