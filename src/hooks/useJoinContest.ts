@@ -24,23 +24,7 @@ export const useJoinContest = (user: User | null) => {
     mutationFn: async (contestId: string) => {
       if (!user?.id) throw new Error("User not authenticated");
 
-      // First verify the contest exists and is joinable
-      const { data: contest, error: contestError } = await supabase
-        .from('contests')
-        .select('*')
-        .eq('id', contestId)
-        .maybeSingle();
-
-      if (contestError) {
-        console.error("Error fetching contest:", contestError);
-        throw new Error("Failed to verify contest status");
-      }
-
-      if (!contest) {
-        throw new Error("Contest not found");
-      }
-
-      // Let the database function handle all other validations
+      // Let the database function handle all validations
       const { data, error } = await supabase.rpc<'join_contest', JoinContestFunction>(
         'join_contest',
         {
@@ -49,14 +33,13 @@ export const useJoinContest = (user: User | null) => {
         }
       );
 
+      // If there's an error from the database function, throw it
       if (error) {
         console.error("Join contest error:", error);
-        if (error.message.includes('duplicate key') || error.message.includes('Already joined')) {
-          throw new Error("You have already joined this contest");
-        }
         throw new Error(error.message);
       }
-      
+
+      // If the operation wasn't successful, throw the error message
       if (!data?.success) {
         throw new Error(data?.error || 'Failed to join contest');
       }
@@ -69,14 +52,14 @@ export const useJoinContest = (user: User | null) => {
         description: "You have successfully joined the contest.",
       });
       
-      // Invalidate all relevant queries first
+      // Invalidate and refetch all relevant queries
       Promise.all([
         queryClient.invalidateQueries({ queryKey: ["joined-contests"] }),
         queryClient.invalidateQueries({ queryKey: ["available-contests"] }),
         queryClient.invalidateQueries({ queryKey: ["my-contests"] }),
         queryClient.invalidateQueries({ queryKey: ["profile"] })
       ]).then(() => {
-        // Then force refetch of critical queries
+        // Force refetch critical queries
         return Promise.all([
           queryClient.refetchQueries({ queryKey: ["joined-contests"] }),
           queryClient.refetchQueries({ queryKey: ["my-contests"] })
@@ -84,12 +67,22 @@ export const useJoinContest = (user: User | null) => {
       });
     },
     onError: (error: Error) => {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.message,
-      });
-      // Invalidate queries to ensure UI is in sync
+      // Show error toast only for actual errors
+      if (error.message.includes('duplicate key') || error.message.includes('Already joined')) {
+        toast({
+          variant: "destructive",
+          title: "Already Joined",
+          description: "You have already joined this contest.",
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: error.message,
+        });
+      }
+      
+      // Ensure UI is in sync
       queryClient.invalidateQueries({ queryKey: ["available-contests"] });
       queryClient.invalidateQueries({ queryKey: ["my-contests"] });
     },
