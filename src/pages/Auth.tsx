@@ -60,7 +60,7 @@ const Auth = () => {
         });
       } else {
         toast({
-          title: isLogin ? "Welcome back!" : "Account created successfully!",
+          title: isLogin ? "Welcome!" : "Account created successfully!",
           description: isLogin
             ? "You have been logged in."
             : "You can now log in with your credentials.",
