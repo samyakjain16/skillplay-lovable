@@ -1,26 +1,13 @@
+
 import { Card, CardContent } from "@/components/ui/card";
 import { ContestDetails } from "./ContestCard/ContestDetails";
 import { ContestStatusButton } from "./ContestStatusButton";
 import { useToast } from "@/components/ui/use-toast";
 import { useNavigate } from "react-router-dom";
-
-interface Contest {
-  id: string;
-  title: string;
-  description: string;
-  series_count: number;
-  max_participants: number;
-  current_participants: number;
-  status: string;
-  start_time: string;
-  end_time: string;
-  prize_pool: number;
-  entry_fee: number;
-  prize_distribution_type: string;
-}
+import { type Contest } from "./ContestTypes";
 
 interface ContestCardProps {
-  contest: Contest & { contest_type: string };
+  contest: Contest;
   onStart?: (contestId: string) => void;
   isStarting?: boolean;
   onJoin?: (contestId: string) => void;
