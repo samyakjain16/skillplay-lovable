@@ -32,8 +32,21 @@ export const ContestCard = ({
     contest.contest_type === 'fixed_participants' && 
     (contest.current_participants || 0) < (contest.max_participants || 0);
 
+  const isPrizeDistributionInProgress = 
+    contest.status === 'completed' && 
+    contest.prize_calculation_status === 'in_progress';
+
   const handleContestAction = async (event: React.MouseEvent) => {
     event.preventDefault();
+    
+    // If prize distribution is in progress, don't allow any actions
+    if (isPrizeDistributionInProgress) {
+      toast({
+        title: "Prize Distribution in Progress",
+        description: "Please wait while prizes are being distributed.",
+      });
+      return;
+    }
     
     // For contests in "Available Contests"
     if (!isInMyContests) {
@@ -54,7 +67,9 @@ export const ContestCard = ({
     }
 
     if (contest.status === 'completed') {
-      navigate(`/contest/${contest.id}/leaderboard`);
+      if (contest.prize_calculation_status === 'completed') {
+        navigate(`/contest/${contest.id}/leaderboard`);
+      }
       return;
     }
 
@@ -77,7 +92,9 @@ export const ContestCard = ({
     <Card 
       className={`w-full transition-all duration-200 hover:shadow-lg ${
         contest.status === 'completed'
-          ? 'cursor-pointer opacity-75'
+          ? contest.prize_calculation_status === 'completed'
+            ? 'cursor-pointer opacity-100'
+            : 'cursor-not-allowed opacity-75'
           : isWaitingForPlayers && isInMyContests
           ? 'cursor-default opacity-75 pointer-events-none'
           : (isStarting || isJoining) 
@@ -92,7 +109,9 @@ export const ContestCard = ({
             <h3 className="text-lg font-semibold">{contest.title}</h3>
             {contest.status === 'completed' && (
               <span className="text-sm text-muted-foreground">
-                Contest completed - View leaderboard
+                {contest.prize_calculation_status === 'in_progress'
+                  ? 'Prize distribution in progress...'
+                  : 'Contest completed - View leaderboard'}
               </span>
             )}
             {isWaitingForPlayers && (
