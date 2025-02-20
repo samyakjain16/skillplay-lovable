@@ -1,22 +1,53 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { ScoringRule, SpeedBonusRule, DatabaseScoringRule } from "./types";
+import type { GameCategory } from "./types";
 
-// In-memory cache
-let scoringRulesCache: Map<string, ScoringRule> | null = null;
-let speedBonusRulesCache: SpeedBonusRule[] | null = null;
+// Cache for scoring rules
+let scoringRulesCache: Map<GameCategory, ScoringRule> | null = null;
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 let lastCacheUpdate = 0;
 
-export async function getScoringRules() {
+interface ScoringRule {
+  base_points: number;
+  additional_points?: number;
+  conditions?: any;
+}
+
+interface SpeedBonusRule {
+  time_threshold: number;
+  bonus_points: number;
+}
+
+// In-memory cache for speed bonus rules
+let speedBonusRulesCache: SpeedBonusRule[] | null = null;
+
+export async function getSpeedBonusRules(): Promise<SpeedBonusRule[]> {
+  if (speedBonusRulesCache) {
+    return speedBonusRulesCache;
+  }
+
+  const { data, error } = await supabase
+    .from('speed_bonus_rules')
+    .select('*')
+    .eq('is_active', true)
+    .order('time_threshold', { ascending: true });
+
+  if (error) {
+    console.error('Error fetching speed bonus rules:', error);
+    throw error;
+  }
+
+  speedBonusRulesCache = data;
+  return data;
+}
+
+export async function getScoringRules(): Promise<Map<GameCategory, ScoringRule>> {
   const now = Date.now();
   
-  // Return cached rules if they're still valid
   if (scoringRulesCache && (now - lastCacheUpdate) < CACHE_DURATION) {
     return scoringRulesCache;
   }
 
-  // Fetch fresh rules from database
   const { data: rules, error } = await supabase
     .from('scoring_rules')
     .select('*')
@@ -28,124 +59,77 @@ export async function getScoringRules() {
     throw error;
   }
 
-  // Transform database rules to application rules
+  // Transform database records to Map
   scoringRulesCache = new Map(
-    (rules as DatabaseScoringRule[]).map(rule => [
-      rule.game_category, 
+    rules.map(rule => [
+      rule.game_category,
       {
-        ...rule,
-        conditions: typeof rule.conditions === 'string' 
-          ? JSON.parse(rule.conditions) 
-          : rule.conditions
+        base_points: rule.base_points,
+        additional_points: rule.additional_points,
+        conditions: rule.conditions
       }
     ])
   );
+  
   lastCacheUpdate = now;
-
   return scoringRulesCache;
 }
 
-export async function getSpeedBonusRules() {
-  const now = Date.now();
-  
-  // Return cached rules if they're still valid
-  if (speedBonusRulesCache && (now - lastCacheUpdate) < CACHE_DURATION) {
-    return speedBonusRulesCache;
-  }
-
-  // Fetch fresh rules from database
-  const { data: rules, error } = await supabase
-    .from('speed_bonus_rules')
-    .select('*')
-    .eq('is_active', true)
-    .order('time_threshold', { ascending: true });
-
-  if (error) {
-    console.error('Error fetching speed bonus rules:', error);
-    if (speedBonusRulesCache) return speedBonusRulesCache;
-    throw error;
-  }
-
-  // Update cache
-  speedBonusRulesCache = rules;
-  lastCacheUpdate = now;
-
-  return speedBonusRulesCache;
-}
-
-export async function calculateGameScore(
-  gameCategory: string,
+export async function calculateScore(
+  category: GameCategory,
   isCorrect: boolean,
-  timeTaken: number,
-  additionalData?: Record<string, any>
+  timeTaken: number | null
 ): Promise<number> {
-  try {
-    const scoringRules = await getScoringRules();
-    const speedBonusRules = await getSpeedBonusRules();
-    
-    // Get base scoring rule for game type
-    const rule = scoringRules.get(gameCategory);
-    if (!rule) {
-      console.error(`No scoring rule found for game category: ${gameCategory}`);
-      return 0;
-    }
+  const rules = await getScoringRules();
+  const rule = rules.get(category);
 
-    // If answer is incorrect, return 0
-    if (!isCorrect) return 0;
-
-    let totalScore = rule.base_points;
-
-    // Add additional points based on conditions if they exist
-    if (rule.additional_points && rule.conditions) {
-      const conditionMet = evaluateConditions(rule.conditions, additionalData);
-      if (conditionMet) {
-        totalScore += rule.additional_points;
-      }
-    }
-
-    // Only calculate speed bonus for correct answers
-    if (isCorrect) {
-      const speedBonus = calculateSpeedBonus(timeTaken, speedBonusRules);
-      totalScore += speedBonus;
-    }
-
-    return totalScore;
-  } catch (error) {
-    console.error('Error calculating game score:', error);
+  if (!rule) {
+    console.error(`No scoring rule found for category: ${category}`);
     return 0;
   }
-}
 
-function evaluateConditions(
-  conditions: Record<string, any>,
-  data?: Record<string, any>
-): boolean {
-  if (!data) return false;
-  
-  switch (conditions.condition) {
-    case 'all_spots_found':
-      return data.foundSpots === data.totalSpots;
-    case 'perfect_score':
-      return data.score === 100;
-    case 'quick_completion':
-      return data.timeTaken && data.timeTaken < conditions.threshold;
-    default:
-      return false;
-  }
-}
+  if (!isCorrect) return 0;
 
-function calculateSpeedBonus(
-  submissionTime: number, // Time at which the answer was submitted
-  gameDuration: number, // Total game duration (30 sec)
-  speedRules: SpeedBonusRule[]
-): number {
-  const remainingTime = gameDuration - submissionTime; // Calculate remaining time
+  let score = rule.base_points;
 
-  // Find the highest applicable bonus based on remaining time
-  for (const rule of speedRules) {
-    if (remainingTime >= rule.time_threshold) {
-      return rule.bonus_points;
+  // Apply speed bonus if time is available
+  if (timeTaken !== null) {
+    const speedBonuses = await getSpeedBonusRules();
+    
+    for (const bonus of speedBonuses) {
+      if (timeTaken <= bonus.time_threshold) {
+        score += bonus.bonus_points;
+        break; // Only apply the highest applicable bonus
+      }
     }
   }
-  return 0;
+
+  return score;
 }
+
+export async function updateGameScore(
+  gameProgressId: string,
+  isCorrect: boolean,
+  timeTaken: number | null,
+  category: GameCategory
+): Promise<void> {
+  // Calculate score based on game type and performance
+  const score = await calculateScore(category, isCorrect, timeTaken);
+
+  // Update the game progress record with the score
+  const { error } = await supabase
+    .from('player_game_progress')
+    .update({
+      score,
+      is_correct: isCorrect,
+      time_taken: timeTaken,
+      completed_at: new Date().toISOString()
+    })
+    .eq('id', gameProgressId);
+
+  if (error) {
+    console.error('Error updating game score:', error);
+    throw error;
+  }
+}
+
