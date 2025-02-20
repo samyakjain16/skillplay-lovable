@@ -1,5 +1,5 @@
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { ContestCard } from "./ContestCard";
@@ -24,29 +24,31 @@ type Contest = {
 
 export const AvailableContests = () => {
   const { user } = useAuth();
-  const queryClient = useQueryClient();
   const joinContestMutation = useJoinContest(user);
 
   // Set up real-time subscription
   useContestRealtime();
 
-  // Query to get user's joined contests
+  // Query to get user's joined contests - crucial for filtering
   const { data: joinedContests } = useQuery({
     queryKey: ["joined-contests", user?.id],
     queryFn: async () => {
       if (!user) return [];
       const { data, error } = await supabase
-        .from("user_contests")
+        .from("contest_participants")  // Changed from user_contests to contest_participants
         .select("contest_id")
         .eq("user_id", user.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error fetching joined contests:", error);
+        throw error;
+      }
       return data.map(uc => uc.contest_id);
     },
     enabled: !!user,
-    staleTime: 0, // Consider data always stale to force refresh
   });
 
+  // Query to get available contests
   const { data: contests, isLoading } = useQuery({
     queryKey: ["available-contests"],
     queryFn: async () => {
@@ -54,14 +56,16 @@ export const AvailableContests = () => {
       const { data, error } = await supabase
         .from("contests")
         .select("*")
-        .in("status", ["upcoming", "waiting_for_players"]) // Allow both statuses
-        .or(`end_time.gt.${now},end_time.is.null`) // Include contests with null end_time or future end_time
+        .in("status", ["upcoming", "waiting_for_players"])
+        .or(`end_time.gt.${now},end_time.is.null`)
         .order("start_time", { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error fetching available contests:", error);
+        throw error;
+      }
       return data;
     },
-    refetchInterval: 10000, // Refetch every 10 seconds
   });
 
   if (isLoading) {
@@ -97,4 +101,3 @@ export const AvailableContests = () => {
     </div>
   );
 };
-
