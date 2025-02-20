@@ -29,13 +29,13 @@ export const AvailableContests = () => {
   // Set up real-time subscription
   useContestRealtime();
 
-  // Query to get user's joined contests - crucial for filtering
+  // Query to get user's joined contests
   const { data: joinedContests } = useQuery({
     queryKey: ["joined-contests", user?.id],
     queryFn: async () => {
       if (!user) return [];
       const { data, error } = await supabase
-        .from("contest_participants")  // Changed from user_contests to contest_participants
+        .from("user_contests")
         .select("contest_id")
         .eq("user_id", user.id);
 
@@ -43,7 +43,7 @@ export const AvailableContests = () => {
         console.error("Error fetching joined contests:", error);
         throw error;
       }
-      return data.map(uc => uc.contest_id);
+      return data?.map(uc => uc.contest_id) ?? [];
     },
     enabled: !!user,
   });
@@ -64,7 +64,7 @@ export const AvailableContests = () => {
         console.error("Error fetching available contests:", error);
         throw error;
       }
-      return data;
+      return data ?? [];
     },
   });
 
@@ -79,14 +79,14 @@ export const AvailableContests = () => {
     const isJoined = joinedContests?.includes(contest.id) || false;
     const isFull = contest.current_participants >= contest.max_participants;
     
-    // Show contests that:
-    // 1. Haven't been joined by the user
-    // 2. Haven't ended yet (or have no end time for fixed_participants)
-    // 3. Aren't full
     return !isJoined && 
            (!endTime || endTime > now) && 
            !isFull;
   }) || [];
+
+  const handleJoinContest = async (contestId: string) => {
+    await joinContestMutation.mutateAsync(contestId);
+  };
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -94,7 +94,7 @@ export const AvailableContests = () => {
         <ContestCard
           key={contest.id}
           contest={contest}
-          onJoin={(contestId) => joinContestMutation.mutate(contestId)}
+          onJoin={handleJoinContest}
           isJoining={joinContestMutation.isPending}
         />
       ))}
