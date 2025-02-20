@@ -98,7 +98,7 @@ export const ContestStatusButton = ({
       buttonState.customClass = "bg-gray-400 text-white cursor-not-allowed";
     } else if (contest.status === "completed") {
       if (contest.prize_calculation_status === 'in_progress') {
-        buttonState.text = "Prize Distribution in Progress";
+        buttonState.text = "Updating Wallet Balance...";
         buttonState.disabled = true;
         buttonState.customClass = "bg-gray-400 text-white cursor-not-allowed";
       } else {
@@ -151,3 +151,4 @@ export const ContestStatusButton = ({
     </div>
   );
 };
+

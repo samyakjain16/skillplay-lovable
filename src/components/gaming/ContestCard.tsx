@@ -42,8 +42,8 @@ export const ContestCard = ({
     // If prize distribution is in progress, don't allow any actions
     if (isPrizeDistributionInProgress) {
       toast({
-        title: "Prize Distribution in Progress",
-        description: "Please wait while prizes are being distributed.",
+        title: "Wallet Balance Update in Progress",
+        description: "Please wait while your wallet balance is being updated.",
       });
       return;
     }
@@ -69,6 +69,11 @@ export const ContestCard = ({
     if (contest.status === 'completed') {
       if (contest.prize_calculation_status === 'completed') {
         navigate(`/contest/${contest.id}/leaderboard`);
+      } else {
+        toast({
+          title: "Wallet Balance Update in Progress",
+          description: "Please wait while your wallet balance is being updated.",
+        });
       }
       return;
     }
@@ -110,7 +115,7 @@ export const ContestCard = ({
             {contest.status === 'completed' && (
               <span className="text-sm text-muted-foreground">
                 {contest.prize_calculation_status === 'in_progress'
-                  ? 'Prize distribution in progress...'
+                  ? 'Updating wallet balance...'
                   : 'Contest completed - View leaderboard'}
               </span>
             )}
@@ -145,3 +150,4 @@ export const ContestCard = ({
     </Card>
   );
 };
+
