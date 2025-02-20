@@ -24,7 +24,6 @@ export const useJoinContest = (user: User | null) => {
     mutationFn: async (contestId: string) => {
       if (!user?.id) throw new Error("User not authenticated");
 
-      // Let the database function handle all validations
       const { data, error } = await supabase.rpc<'join_contest', JoinContestFunction>(
         'join_contest',
         {
@@ -33,13 +32,13 @@ export const useJoinContest = (user: User | null) => {
         }
       );
 
-      // If there's an error from the database function, throw it
+      // Handle all possible error cases
       if (error) {
         console.error("Join contest error:", error);
-        throw new Error(error.message);
+        // Don't transform the error, let the database error flow through
+        throw error;
       }
 
-      // If the operation wasn't successful, throw the error message
       if (!data?.success) {
         throw new Error(data?.error || 'Failed to join contest');
       }
@@ -52,39 +51,36 @@ export const useJoinContest = (user: User | null) => {
         description: "You have successfully joined the contest.",
       });
       
-      // Invalidate and refetch all relevant queries
-      Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["joined-contests"] }),
-        queryClient.invalidateQueries({ queryKey: ["available-contests"] }),
-        queryClient.invalidateQueries({ queryKey: ["my-contests"] }),
-        queryClient.invalidateQueries({ queryKey: ["profile"] })
-      ]).then(() => {
-        // Force refetch critical queries
-        return Promise.all([
-          queryClient.refetchQueries({ queryKey: ["joined-contests"] }),
-          queryClient.refetchQueries({ queryKey: ["my-contests"] })
-        ]);
+      // Invalidate queries first
+      return queryClient.invalidateQueries({ 
+        queryKey: ["joined-contests", "available-contests", "my-contests", "profile"]
       });
     },
-    onError: (error: Error) => {
-      // Show error toast only for actual errors
-      if (error.message.includes('duplicate key') || error.message.includes('Already joined')) {
-        toast({
-          variant: "destructive",
-          title: "Already Joined",
-          description: "You have already joined this contest.",
-        });
-      } else {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: error.message,
-        });
+    onError: (error: any) => {
+      let title = "Error";
+      let description = "Failed to join contest";
+
+      // Handle specific database error cases
+      if (error?.code === '23505' || error?.message?.includes('duplicate')) {
+        description = "You have already joined this contest";
+      } else if (error?.message?.includes('Contest is full')) {
+        description = "This contest is full";
+      } else if (error?.message?.includes('Insufficient balance')) {
+        description = "Insufficient wallet balance";
+      } else if (error?.message) {
+        description = error.message;
       }
-      
-      // Ensure UI is in sync
-      queryClient.invalidateQueries({ queryKey: ["available-contests"] });
-      queryClient.invalidateQueries({ queryKey: ["my-contests"] });
+
+      toast({
+        variant: "destructive",
+        title,
+        description,
+      });
+
+      // Refresh the UI state
+      queryClient.invalidateQueries({ 
+        queryKey: ["available-contests", "my-contests"] 
+      });
     },
   });
 };

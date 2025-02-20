@@ -36,33 +36,22 @@ export const ContestCard = ({
   const handleContestAction = async () => {
     // For contests in "Available Contests"
     if (!isInMyContests) {
-      // Check if contest is full
-      if (contest.current_participants >= contest.max_participants) {
-        toast({
-          variant: "destructive",
-          title: "Contest Full",
-          description: "This contest has reached its maximum number of participants.",
-        });
-        return;
-      }
-
       // Prevent multiple clicks while joining
       if (isJoining) {
         return;
       }
 
-      // Allow joining for any valid contest
+      // Let the database handle all validations
       try {
         await onJoin?.(contest.id);
-      } catch (error) {
-        // Error handling is now done in the useJoinContest hook
+      } catch {
+        // Error is handled in the useJoinContest hook
         return;
       }
       return;
     }
 
     // For contests in "My Contests"
-    // If fixed_participants contest is waiting for players, show message and prevent action
     if (isWaitingForPlayers) {
       toast({
         title: "Waiting for Players",
