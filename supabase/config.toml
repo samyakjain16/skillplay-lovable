@@ -6,4 +6,3 @@ verify_jwt = false
 
 [functions.check_completed_contests]
 verify_jwt = false
-schedule = "*/1 * * * *"
