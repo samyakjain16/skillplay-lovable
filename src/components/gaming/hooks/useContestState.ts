@@ -30,9 +30,9 @@ export const useContestState = (
     const endTime = new Date(gameStartTime.getTime() + 30000); // 30 seconds from start
     const now = new Date();
     
-    // If more than 30 seconds have passed since game start, end immediately
+    // If the game has already ended, return null to trigger game end
     if (now > endTime) {
-      return now;
+      return null;
     }
     return endTime;
   };
@@ -81,7 +81,6 @@ export const useContestState = (
         return;
       }
 
-      // Use server's game start time if available
       const serverGameStartTime = data.user_contests[0].current_game_start_time;
       
       if (serverGameStartTime) {
@@ -89,14 +88,15 @@ export const useContestState = (
         const timeDiff = now.getTime() - serverStartDate.getTime();
         
         // If more than 30 seconds have passed since server start time,
-        // this game should be ended
+        // move to the next game with score 0
         if (timeDiff >= 30000) {
           console.log("Game time expired based on server time");
           gameEndInProgress.current = true;
+          // This will trigger handleGameEnd with score 0
           return;
         }
         
-        // Use server's start time to maintain consistency
+        // Use server's start time if it exists
         setGameStartTime(serverStartDate);
         timerInitialized.current = true;
       } else if (!timerInitialized.current || currentGameIndex !== data.user_contests[0].current_game_index) {
