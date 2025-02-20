@@ -8,7 +8,7 @@ import { ContestProgressBar } from "./ContestProgressBar";
 import { type Contest } from "./ContestTypes";
 
 interface ContestStatusButtonProps {
-  contest: Pick<Contest, "id" | "status" | "start_time" | "end_time" | "current_participants" | "max_participants" | "series_count" | "contest_type">;
+  contest: Pick<Contest, "id" | "status" | "start_time" | "end_time" | "current_participants" | "max_participants" | "series_count" | "contest_type" | "prize_calculation_status">;
   onClick?: () => void;
   loading?: boolean;
   isInMyContests?: boolean;
@@ -97,9 +97,15 @@ export const ContestStatusButton = ({
       buttonState.disabled = true;
       buttonState.customClass = "bg-gray-400 text-white cursor-not-allowed";
     } else if (contest.status === "completed") {
-      buttonState.text = "View Leaderboard";
-      buttonState.variant = "default";
-      buttonState.customClass = "bg-gray-600 hover:bg-gray-700 text-white";
+      if (contest.prize_calculation_status === 'in_progress') {
+        buttonState.text = "Calculating Results...";
+        buttonState.disabled = true;
+        buttonState.customClass = "bg-gray-400 text-white cursor-not-allowed";
+      } else {
+        buttonState.text = "View Leaderboard";
+        buttonState.variant = "default";
+        buttonState.customClass = "bg-gray-600 hover:bg-gray-700 text-white";
+      }
     } else if (userCompletedGames) {
       buttonState.text = "Games Completed";
       buttonState.disabled = true;

@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { PrizeDistributionModel, DatabasePrizeModel } from "./types";
 
@@ -62,8 +61,8 @@ export async function calculatePrizeDistribution(
   if (contestError) throw contestError;
 
   // If prizes are already calculated or in progress, return existing distribution
-  if (contest.prize_calculation_status === 'completed' || contest.prize_calculation_status === 'in_progress') {
-    console.log('Prizes already calculated or in progress for contest:', contestId);
+  if (contest.prize_calculation_status === 'completed') {
+    console.log('Prizes already calculated for contest:', contestId);
     const { data: transactions } = await supabase
       .from('wallet_transactions')
       .select('user_id, amount')
@@ -77,6 +76,12 @@ export async function calculatePrizeDistribution(
     return existingDistribution;
   }
 
+  // If prizes are being calculated, return empty map
+  if (contest.prize_calculation_status === 'in_progress') {
+    console.log('Prize calculation in progress for contest:', contestId);
+    return new Map<string, number>();
+  }
+
   // Only calculate prizes for completed contests
   if (contest.status !== 'completed') {
     console.log('Contest not completed yet:', contestId);
@@ -84,14 +89,16 @@ export async function calculatePrizeDistribution(
   }
 
   try {
-    // Set status to in_progress
-    const { error: statusError } = await supabase
-      .from('contests')
-      .update({ prize_calculation_status: 'in_progress' })
-      .eq('id', contestId)
-      .eq('prize_calculation_status', 'pending');
+    // Set status to in_progress if not already set
+    if (contest.prize_calculation_status === 'pending') {
+      const { error: statusError } = await supabase
+        .from('contests')
+        .update({ prize_calculation_status: 'in_progress' })
+        .eq('id', contestId)
+        .eq('prize_calculation_status', 'pending');
 
-    if (statusError) throw statusError;
+      if (statusError) throw statusError;
+    }
 
     const models = await getPrizeDistributionModels();
     const model = models.get(distributionType);
