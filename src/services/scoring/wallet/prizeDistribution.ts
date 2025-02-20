@@ -31,7 +31,7 @@ export async function distributePrizes(
   console.log('Starting prize distribution for contest:', contestId);
 
   try {
-    // Start a transaction for the contest status update
+    // Start by updating contest status
     const { error: updateError } = await supabase
       .from('contests')
       .update({ prize_calculation_status: 'in_progress' })
@@ -61,18 +61,33 @@ export async function distributePrizes(
 
         const newBalance = (profile.wallet_balance || 0) + prizeAmount;
 
-        // Use RPC to handle the transaction atomically on the database side
-        const { error: transactionError } = await retryOperation(async () => 
-          await supabase.rpc('process_prize_distribution', {
-            p_user_id: userId,
-            p_contest_id: contestId,
-            p_amount: prizeAmount,
-            p_new_balance: newBalance
-          })
+        // Create transaction record
+        const { error: transactionError } = await retryOperation(async () =>
+          await supabase
+            .from('wallet_transactions')
+            .insert({
+              user_id: userId,
+              amount: prizeAmount,
+              type: 'prize_payout',
+              reference_id: contestId,
+              status: 'completed'
+            })
         );
 
         if (transactionError) {
-          throw new Error(`Transaction failed for user ${userId}: ${transactionError.message}`);
+          throw new Error(`Failed to create transaction record for user ${userId}`);
+        }
+
+        // Update wallet balance
+        const { error: balanceError } = await retryOperation(async () =>
+          await supabase
+            .from('profiles')
+            .update({ wallet_balance: newBalance })
+            .eq('id', userId)
+        );
+
+        if (balanceError) {
+          throw new Error(`Failed to update balance for user ${userId}`);
         }
 
         console.log(`Successfully processed prize for user ${userId}. New balance: ${newBalance}`);
