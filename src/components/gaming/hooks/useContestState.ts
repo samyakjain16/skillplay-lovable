@@ -30,7 +30,6 @@ export const useContestState = (
     const endTime = new Date(gameStartTime.getTime() + 30000); // 30 seconds from start
     const now = new Date();
     
-    // If the game has already ended, return null to trigger game end
     if (now > endTime) {
       return null;
     }
@@ -44,69 +43,67 @@ export const useContestState = (
 
     try {
       updateInProgress.current = true;
-      const now = new Date();
 
-      // Use a single query to get both contest and user_contest status
-      const { data, error } = await supabase
-        .from('contests')
-        .select(`
-          status,
-          user_contests!inner (
-            status,
-            current_game_index,
-            current_game_start_time
-          )
-        `)
-        .eq('id', contestId)
-        .eq('user_contests.user_id', user.id)
+      // Get current server-side state
+      const { data: userContest, error: userContestError } = await supabase
+        .from('user_contests')
+        .select('current_game_index, current_game_start_time, status')
+        .eq('contest_id', contestId)
+        .eq('user_id', user.id)
         .single();
 
-      if (error) {
-        console.error('Error checking status:', error.message);
+      if (userContestError) {
+        console.error('Error fetching user contest:', userContestError);
         return;
       }
 
-      if (!data) {
-        navigate('/gaming');
+      // Check if the contest is still active
+      const { data: contest, error: contestError } = await supabase
+        .from('contests')
+        .select('status')
+        .eq('id', contestId)
+        .single();
+
+      if (contestError) {
+        console.error('Error fetching contest:', contestError);
         return;
       }
 
-      if (data.status === 'completed') {
+      // Handle completed states
+      if (contest.status === 'completed') {
         navigate(`/contest/${contestId}/leaderboard`);
         return;
       }
 
-      if (data.user_contests[0].status === 'completed') {
+      if (userContest.status === 'completed') {
         navigate('/gaming');
         return;
       }
 
-      const serverGameStartTime = data.user_contests[0].current_game_start_time;
+      // Sync with server game index
+      if (userContest.current_game_index !== currentGameIndex) {
+        setCurrentGameIndex(userContest.current_game_index);
+      }
+
+      const now = new Date();
       
-      if (serverGameStartTime) {
-        const serverStartDate = new Date(serverGameStartTime);
-        const timeDiff = now.getTime() - serverStartDate.getTime();
-        
-        // If more than 30 seconds have passed since server start time,
-        // move to the next game with score 0
+      // Handle game timing
+      if (userContest.current_game_start_time) {
+        const serverStartTime = new Date(userContest.current_game_start_time);
+        const timeDiff = now.getTime() - serverStartTime.getTime();
+
         if (timeDiff >= 30000) {
-          console.log("Game time expired based on server time");
+          // Game has expired, trigger end
           gameEndInProgress.current = true;
-          // This will trigger handleGameEnd with score 0
           return;
         }
-        
-        // Use server's start time if it exists
-        setGameStartTime(serverStartDate);
-        timerInitialized.current = true;
-      } else if (!timerInitialized.current || currentGameIndex !== data.user_contests[0].current_game_index) {
-        // Only set new start time if timer isn't initialized or it's a new game
-        setCurrentGameIndex(data.user_contests[0].current_game_index);
-        setGameStartTime(now);
-        timerInitialized.current = true;
 
+        // Use server time
+        setGameStartTime(serverStartTime);
+        timerInitialized.current = true;
+      } else if (!timerInitialized.current) {
+        // Only set new start time if timer isn't initialized
         const updateData = {
-          current_game_index: data.user_contests[0].current_game_index,
           current_game_start_time: now.toISOString(),
           status: 'active'
         };
@@ -116,6 +113,9 @@ export const useContestState = (
           .update(updateData)
           .eq('contest_id', contestId)
           .eq('user_id', user.id);
+
+        setGameStartTime(now);
+        timerInitialized.current = true;
       }
 
     } catch (error) {
