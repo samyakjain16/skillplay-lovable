@@ -97,15 +97,11 @@ export const ContestStatusButton = ({
       buttonState.disabled = true;
       buttonState.customClass = "bg-gray-400 text-white cursor-not-allowed";
     } else if (contest.status === "completed") {
-      if (contest.prize_calculation_status === 'in_progress') {
-        buttonState.text = "Updating Wallet Balance...";
-        buttonState.disabled = true;
-        buttonState.customClass = "bg-gray-400 text-white cursor-not-allowed";
-      } else {
-        buttonState.text = "View Leaderboard";
-        buttonState.variant = "default";
-        buttonState.customClass = "bg-gray-600 hover:bg-gray-700 text-white";
-      }
+      buttonState.text = "View Leaderboard";
+      buttonState.disabled = contest.prize_calculation_status !== 'completed';
+      buttonState.customClass = buttonState.disabled 
+        ? "bg-gray-400 text-white cursor-not-allowed"
+        : "bg-gray-600 hover:bg-gray-700 text-white";
     } else if (userCompletedGames) {
       buttonState.text = "Games Completed";
       buttonState.disabled = true;
@@ -151,4 +147,3 @@ export const ContestStatusButton = ({
     </div>
   );
 };
-

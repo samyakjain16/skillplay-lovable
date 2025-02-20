@@ -32,21 +32,8 @@ export const ContestCard = ({
     contest.contest_type === 'fixed_participants' && 
     (contest.current_participants || 0) < (contest.max_participants || 0);
 
-  const isPrizeDistributionInProgress = 
-    contest.status === 'completed' && 
-    contest.prize_calculation_status === 'in_progress';
-
   const handleContestAction = async (event: React.MouseEvent) => {
     event.preventDefault();
-    
-    // If prize distribution is in progress, don't allow any actions
-    if (isPrizeDistributionInProgress) {
-      toast({
-        title: "Wallet Balance Update in Progress",
-        description: "Please wait while your wallet balance is being updated.",
-      });
-      return;
-    }
     
     // For contests in "Available Contests"
     if (!isInMyContests) {
@@ -69,11 +56,6 @@ export const ContestCard = ({
     if (contest.status === 'completed') {
       if (contest.prize_calculation_status === 'completed') {
         navigate(`/contest/${contest.id}/leaderboard`);
-      } else {
-        toast({
-          title: "Wallet Balance Update in Progress",
-          description: "Please wait while your wallet balance is being updated.",
-        });
       }
       return;
     }
@@ -112,13 +94,6 @@ export const ContestCard = ({
         <div className="space-y-4">
           <div>
             <h3 className="text-lg font-semibold">{contest.title}</h3>
-            {contest.status === 'completed' && (
-              <span className="text-sm text-muted-foreground">
-                {contest.prize_calculation_status === 'in_progress'
-                  ? 'Updating wallet balance...'
-                  : 'Contest completed - View leaderboard'}
-              </span>
-            )}
             {isWaitingForPlayers && (
               <span className="text-sm text-muted-foreground">
                 Waiting for more players to join ({contest.current_participants}/{contest.max_participants})
@@ -150,4 +125,3 @@ export const ContestCard = ({
     </Card>
   );
 };
-
