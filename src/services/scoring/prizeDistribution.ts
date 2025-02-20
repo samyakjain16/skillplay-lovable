@@ -52,7 +52,7 @@ export async function calculatePrizeDistribution(
   totalPrizePool: number,
   distributionType: string
 ): Promise<Map<string, number>> {
-  // Check if prizes have already been calculated
+  // First check contest status and prize calculation status
   const { data: contest, error: contestError } = await supabase
     .from('contests')
     .select('prize_calculation_status, status')
@@ -61,9 +61,9 @@ export async function calculatePrizeDistribution(
 
   if (contestError) throw contestError;
 
-  // If prizes are already calculated, return existing distribution
-  if (contest.prize_calculation_status === 'completed') {
-    console.log('Prizes already calculated for contest:', contestId);
+  // If prizes are already calculated or in progress, return existing distribution
+  if (contest.prize_calculation_status === 'completed' || contest.prize_calculation_status === 'in_progress') {
+    console.log('Prizes already calculated or in progress for contest:', contestId);
     const { data: transactions } = await supabase
       .from('wallet_transactions')
       .select('user_id, amount')
@@ -83,48 +83,74 @@ export async function calculatePrizeDistribution(
     return new Map<string, number>();
   }
 
-  const models = await getPrizeDistributionModels();
-  const model = models.get(distributionType);
+  try {
+    // Set status to in_progress
+    const { error: statusError } = await supabase
+      .from('contests')
+      .update({ prize_calculation_status: 'in_progress' })
+      .eq('id', contestId)
+      .eq('prize_calculation_status', 'pending');
 
-  if (!model) {
-    console.error('Distribution type not found:', distributionType);
-    console.log('Available models:', Array.from(models.keys()));
-    throw new Error(`No prize distribution model found for type: ${distributionType}`);
-  }
+    if (statusError) throw statusError;
 
-  // Get final rankings for the contest
-  const { data: rankings, error } = await supabase
-    .rpc('get_contest_leaderboard', { contest_id: contestId });
+    const models = await getPrizeDistributionModels();
+    const model = models.get(distributionType);
 
-  if (error) {
-    console.error('Error fetching contest rankings:', error);
+    if (!model) {
+      throw new Error(`No prize distribution model found for type: ${distributionType}`);
+    }
+
+    // Get final rankings for the contest
+    const { data: rankings, error } = await supabase
+      .rpc('get_contest_leaderboard', { contest_id: contestId });
+
+    if (error) throw error;
+
+    if (!rankings || rankings.length === 0) {
+      await updatePrizeCalculationStatus(contestId, 'completed');
+      return new Map<string, number>();
+    }
+
+    const prizeDistribution = new Map<string, number>();
+
+    // Calculate prize amounts based on distribution rules and total prize pool
+    rankings.forEach((ranking, index) => {
+      const rank = (index + 1).toString();
+      const percentage = model.distribution_rules[rank];
+      
+      if (percentage) {
+        const prizeAmount = (totalPrizePool * percentage) / 100;
+        prizeDistribution.set(ranking.user_id, prizeAmount);
+      }
+    });
+
+    // After calculating prizes, distribute them
+    if (prizeDistribution.size > 0) {
+      await distributePrizes(contestId, prizeDistribution);
+    }
+
+    // Mark as completed
+    await updatePrizeCalculationStatus(contestId, 'completed');
+
+    return prizeDistribution;
+  } catch (error) {
+    // If something goes wrong, mark as failed
+    console.error('Error during prize distribution:', error);
+    await updatePrizeCalculationStatus(contestId, 'failed');
     throw error;
   }
+}
 
-  if (!rankings || rankings.length === 0) {
-    console.log('No rankings found for contest:', contestId);
-    return new Map<string, number>();
+async function updatePrizeCalculationStatus(contestId: string, status: 'pending' | 'in_progress' | 'completed' | 'failed') {
+  const { error } = await supabase
+    .from('contests')
+    .update({ prize_calculation_status: status })
+    .eq('id', contestId);
+
+  if (error) {
+    console.error(`Error updating prize calculation status to ${status}:`, error);
+    throw error;
   }
-
-  const prizeDistribution = new Map<string, number>();
-
-  // Calculate prize amounts based on distribution rules and total prize pool
-  rankings.forEach((ranking, index) => {
-    const rank = (index + 1).toString();
-    const percentage = model.distribution_rules[rank];
-    
-    if (percentage) {
-      const prizeAmount = (totalPrizePool * percentage) / 100;
-      prizeDistribution.set(ranking.user_id, prizeAmount);
-    }
-  });
-
-  // After calculating prizes, distribute them and update status
-  if (prizeDistribution.size > 0) {
-    await distributePrizes(contestId, prizeDistribution);
-  }
-
-  return prizeDistribution;
 }
 
 export async function distributePrizes(
@@ -133,36 +159,22 @@ export async function distributePrizes(
 ): Promise<void> {
   const client = supabase;
 
-  try {
-    // First check if the contest is in a valid state for prize distribution
-    const { data: contest, error: contestError } = await client
-      .from('contests')
-      .select('prize_calculation_status, status')
-      .eq('id', contestId)
-      .single();
+  for (const [userId, prizeAmount] of prizeDistribution.entries()) {
+    try {
+      // Check if prize was already distributed
+      const { data: existingTransaction } = await client
+        .from('wallet_transactions')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('reference_id', contestId)
+        .eq('type', 'prize_payout')
+        .single();
 
-    if (contestError) throw contestError;
+      if (existingTransaction) {
+        console.log('Prize already distributed to user:', userId);
+        continue;
+      }
 
-    if (contest.prize_calculation_status === 'completed') {
-      console.log('Prizes already distributed for contest:', contestId);
-      return;
-    }
-
-    if (contest.status !== 'completed') {
-      throw new Error('Cannot distribute prizes for non-completed contest');
-    }
-
-    // Set status to in_progress
-    const { error: statusError } = await client
-      .from('contests')
-      .update({ prize_calculation_status: 'in_progress' })
-      .eq('id', contestId)
-      .eq('prize_calculation_status', 'pending');
-
-    if (statusError) throw statusError;
-
-    // Process each winner's prize
-    for (const [userId, prizeAmount] of prizeDistribution.entries()) {
       // Get current wallet balance
       const { data: profile, error: profileError } = await client
         .from('profiles')
@@ -202,27 +214,8 @@ export async function distributePrizes(
       if (updateError) {
         console.error('Error updating wallet balance:', updateError);
       }
+    } catch (error) {
+      console.error('Error distributing prize to user:', userId, error);
     }
-
-    // Mark prize calculation as completed
-    const { error: finalStatusError } = await client
-      .from('contests')
-      .update({ prize_calculation_status: 'completed' })
-      .eq('id', contestId)
-      .eq('prize_calculation_status', 'in_progress');
-
-    if (finalStatusError) {
-      throw finalStatusError;
-    }
-
-  } catch (error) {
-    console.error('Error during prize distribution:', error);
-    // Try to revert status to pending if something went wrong
-    await client
-      .from('contests')
-      .update({ prize_calculation_status: 'pending' })
-      .eq('id', contestId)
-      .eq('prize_calculation_status', 'in_progress');
-    throw error;
   }
 }
