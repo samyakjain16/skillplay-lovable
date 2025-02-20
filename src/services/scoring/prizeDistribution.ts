@@ -156,11 +156,11 @@ export async function distributePrizes(
         continue;
       }
 
-      // Update wallet balance directly
+      // Update wallet balance using SQL template
       const { error: updateError } = await supabase
         .from('profiles')
-        .update({ 
-          wallet_balance: supabase.raw('wallet_balance + ?', [prizeAmount])
+        .update({
+          wallet_balance: `wallet_balance + ${prizeAmount}`
         })
         .eq('id', userId);
 
