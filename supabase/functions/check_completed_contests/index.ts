@@ -20,7 +20,7 @@ Deno.serve(async (req) => {
 
     console.log('Checking for completed contests...')
 
-    // First update contest statuses
+    // Update contest statuses using the database function
     const { error: updateError } = await supabaseClient
       .rpc('check_and_update_contests')
 
@@ -28,56 +28,9 @@ Deno.serve(async (req) => {
       throw updateError
     }
 
-    // Get contests that need prize distribution
-    const { data: completedContests, error: fetchError } = await supabaseClient
-      .from('contests')
-      .select('id, entry_fee, current_participants, prize_distribution_type')
-      .eq('status', 'completed')
-      .eq('prize_calculation_status', 'in_progress')
-
-    if (fetchError) {
-      throw fetchError
-    }
-
-    console.log(`Found ${completedContests?.length || 0} contests requiring prize distribution`)
-
-    // Process each completed contest
-    for (const contest of completedContests || []) {
-      try {
-        console.log(`Initiating prize distribution for contest ${contest.id}`)
-        
-        // Call the prize distribution function for each contest
-        const response = await fetch(
-          `${Deno.env.get('SUPABASE_URL')}/functions/v1/distribute_contest_prizes`,
-          {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ contestId: contest.id })
-          }
-        )
-
-        if (!response.ok) {
-          throw new Error(`Failed to distribute prizes for contest ${contest.id}`)
-        }
-
-        console.log(`Successfully processed contest ${contest.id}`)
-      } catch (error) {
-        console.error(`Error processing contest ${contest.id}:`, error)
-        
-        // Mark the contest as failed if prize distribution fails
-        await supabaseClient
-          .from('contests')
-          .update({ prize_calculation_status: 'failed' })
-          .eq('id', contest.id)
-      }
-    }
-
     return new Response(JSON.stringify({ 
       success: true,
-      message: `Processed ${completedContests?.length || 0} contests`
+      message: 'Contest statuses updated successfully'
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
