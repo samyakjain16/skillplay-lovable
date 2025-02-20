@@ -23,10 +23,11 @@ export const useContestState = (
   const hasRedirected = useRef(false);
   const updateInProgress = useRef(false);
   const gameEndInProgress = useRef(false);
+  const timerInitialized = useRef(false);
 
   const getGameEndTime = (): Date | null => {
-    if (!gameStartTime) return null;
-    return new Date(gameStartTime.getTime() + 30000);
+    if (!gameStartTime || timerInitialized.current === false) return null;
+    return new Date(gameStartTime.getTime() + 30000); // 30 seconds from start
   };
 
   const updateGameProgress = async () => {
@@ -45,7 +46,8 @@ export const useContestState = (
           status,
           user_contests!inner (
             status,
-            current_game_index
+            current_game_index,
+            current_game_start_time
           )
         `)
         .eq('id', contestId)
@@ -72,21 +74,27 @@ export const useContestState = (
         return;
       }
 
-      // Set the current game index from the database to ensure consistency
-      setCurrentGameIndex(data.user_contests[0].current_game_index);
-      setGameStartTime(now);
+      // Only update game start time if it hasn't been set or if it's a new game
+      if (!timerInitialized.current || 
+          !data.user_contests[0].current_game_start_time || 
+          currentGameIndex !== data.user_contests[0].current_game_index) {
+        
+        setCurrentGameIndex(data.user_contests[0].current_game_index);
+        setGameStartTime(now);
+        timerInitialized.current = true;
 
-      const updateData = {
-        current_game_index: data.user_contests[0].current_game_index,
-        current_game_start_time: now.toISOString(),
-        status: 'active'
-      };
+        const updateData = {
+          current_game_index: data.user_contests[0].current_game_index,
+          current_game_start_time: now.toISOString(),
+          status: 'active'
+        };
 
-      await supabase
-        .from('user_contests')
-        .update(updateData)
-        .eq('contest_id', contestId)
-        .eq('user_id', user.id);
+        await supabase
+          .from('user_contests')
+          .update(updateData)
+          .eq('contest_id', contestId)
+          .eq('user_id', user.id);
+      }
 
     } catch (error) {
       if (error instanceof Error) {
