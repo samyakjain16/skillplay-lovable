@@ -156,11 +156,13 @@ export async function distributePrizes(
         continue;
       }
 
-      // Then update wallet balance
-      const { error: updateError } = await supabase.rpc('update_wallet_balance', {
-        p_user_id: userId,
-        p_amount: prizeAmount
-      });
+      // Update wallet balance directly
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ 
+          wallet_balance: supabase.raw('wallet_balance + ?', [prizeAmount])
+        })
+        .eq('id', userId);
 
       if (updateError) {
         console.error('Error updating wallet balance:', updateError);

@@ -1,4 +1,6 @@
 
+export type GameCategory = 'trivia' | 'spot_difference' | 'arrange_sort';
+
 export interface PrizeDistributionModel {
   id: string;
   name: string;
