@@ -135,12 +135,15 @@ function evaluateConditions(
 }
 
 function calculateSpeedBonus(
-  timeTaken: number,
+  submissionTime: number, // Time at which the answer was submitted
+  gameDuration: number, // Total game duration (30 sec)
   speedRules: SpeedBonusRule[]
 ): number {
-  // Find the highest applicable bonus based on time taken
+  const remainingTime = gameDuration - submissionTime; // Calculate remaining time
+
+  // Find the highest applicable bonus based on remaining time
   for (const rule of speedRules) {
-    if (timeTaken <= rule.time_threshold) {
+    if (remainingTime >= rule.time_threshold) {
       return rule.bonus_points;
     }
   }
