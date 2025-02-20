@@ -56,6 +56,11 @@ export const ContestCard = ({
     if (contest.status === 'completed') {
       if (contest.prize_calculation_status === 'completed') {
         navigate(`/contest/${contest.id}/leaderboard`);
+      } else {
+        toast({
+          title: "Processing Results",
+          description: "Please wait while we calculate the final results.",
+        });
       }
       return;
     }

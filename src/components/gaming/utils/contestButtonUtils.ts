@@ -41,6 +41,7 @@ export const getContestState = (
     current_participants: number;
     max_participants: number;
     series_count: number;
+    prize_calculation_status?: string;
   },
   isInMyContests?: boolean,
   userCompletedGames?: boolean
@@ -56,9 +57,11 @@ export const getContestState = (
     return {
       text: "View Leaderboard",
       variant: "secondary",
-      disabled: false,
+      disabled: contest.prize_calculation_status !== 'completed',
       showProgress: false,
-      customClass: "bg-gray-600 hover:bg-gray-700 text-white",
+      customClass: contest.prize_calculation_status === 'completed' 
+        ? "bg-gray-600 hover:bg-gray-700 text-white"
+        : "bg-gray-400 text-white cursor-not-allowed",
     };
   }
 
