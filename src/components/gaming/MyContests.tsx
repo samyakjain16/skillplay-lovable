@@ -14,6 +14,12 @@ type Participation = {
   contest_id: string;
   joined_at: string;
   contest: Contest;
+  status: string;
+  completed_at?: string;
+  current_game_index: number;
+  current_game_score: number;
+  current_game_start_time?: string;
+  score: number;
 };
 
 export const MyContests = () => {
@@ -115,20 +121,15 @@ export const MyContests = () => {
 
       if (error) throw error;
 
-      return data.map((participation: Participation) => {
-        const now = new Date();
-        const startTime = new Date(participation.contest.start_time);
-        const endTime = new Date(participation.contest.end_time);
-
-        // Update status based on current time
-        if (endTime < now) {
-          participation.contest.status = "completed";
-        } else if (startTime <= now && now < endTime) {
-          participation.contest.status = "in_progress";
+      return data.map((participation: any) => ({
+        ...participation,
+        contest: {
+          ...participation.contest,
+          status: participation.contest.status as Contest['status'],
+          contest_type: participation.contest.contest_type as Contest['contest_type'],
+          prize_calculation_status: participation.contest.prize_calculation_status || 'pending'
         }
-        
-        return participation;
-      });
+      }));
     },
     enabled: !!user?.id,
     refetchInterval: 10000, // Refetch every 10 seconds to check for status updates

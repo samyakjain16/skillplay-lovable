@@ -5,22 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { ContestCard } from "./ContestCard";
 import { useJoinContest } from "@/hooks/useJoinContest";
 import { useContestRealtime } from "@/hooks/useContestRealtime";
-
-type Contest = {
-  id: string;
-  title: string;
-  description: string;
-  series_count: number;
-  max_participants: number;
-  current_participants: number;
-  status: string;
-  start_time: string | null;
-  end_time: string | null;
-  prize_pool: number;
-  entry_fee: number;
-  prize_distribution_type: string;
-  contest_type: string;
-};
+import { type Contest } from "./ContestTypes";
 
 export const AvailableContests = () => {
   const { user } = useAuth();
@@ -64,7 +49,14 @@ export const AvailableContests = () => {
         console.error("Error fetching available contests:", error);
         throw error;
       }
-      return data ?? [];
+
+      // Transform the data to ensure status is one of the allowed values
+      return (data ?? []).map(contest => ({
+        ...contest,
+        status: contest.status as Contest['status'],
+        contest_type: contest.contest_type as Contest['contest_type'],
+        prize_calculation_status: contest.prize_calculation_status || 'pending'
+      }));
     },
   });
 
