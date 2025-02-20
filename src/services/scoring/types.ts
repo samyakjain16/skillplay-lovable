@@ -1,12 +1,14 @@
 
 export interface ScoringRule {
   id: string;
-  game_category: 'arrange_sort' | 'trivia' | 'spot_difference';
+  game_category: GameCategory;
   base_points: number;
   additional_points?: number | null;
   conditions?: Record<string, any> | null;
   is_active: boolean;
 }
+
+export type GameCategory = 'arrange_sort' | 'trivia' | 'spot_difference';
 
 export interface SpeedBonusRule {
   id: string;

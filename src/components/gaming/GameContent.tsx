@@ -5,7 +5,7 @@ import { ArrangeSortGame } from "./games/ArrangeSortGame";
 import { TriviaGame } from "./games/TriviaGame";
 import { SpotDifferenceGame } from "./games/SpotDifferenceGame";
 import { useEffect } from "react";
-import { calculateGameScore } from "@/services/scoring/scoringRules";
+import { calculateScore } from "@/services/scoring/scoringRules";
 import { Loader2 } from "lucide-react";
 
 interface GameContentProps {
@@ -53,11 +53,10 @@ export const GameContent = ({
     }
 
     try {
-      const score = await calculateGameScore(
+      const score = await calculateScore(
         currentGame.game_content.category,
         isCorrect,
-        timeTaken,
-        additionalData
+        timeTaken
       );
       onGameEnd(score);
     } catch (error) {
