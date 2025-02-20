@@ -1,109 +1,147 @@
-import { serve } from 'std/server';
-import { createClient } from '@supabase/supabase-js';
+
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+}
 
-serve(async (req) => {
+Deno.serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response(null, { headers: corsHeaders })
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY');
-
-    if (!supabaseUrl || !supabaseKey) {
-      throw new Error('Missing Supabase URL or key');
+    const { contestId } = await req.json()
+    
+    if (!contestId) {
+      throw new Error('Contest ID is required')
     }
 
-    const supabase = createClient(supabaseUrl, supabaseKey, {
-      auth: {
-        persistSession: false,
-      },
-    });
+    console.log('Processing prize distribution for contest:', contestId)
 
-    // Fetch contests that are completed but prize calculation is pending
-    const { data: contests, error: contestsError } = await supabase
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
+
+    // Get contest details
+    const { data: contest, error: contestError } = await supabaseClient
       .from('contests')
       .select('*')
-      .eq('status', 'completed')
-      .eq('prize_calculation_status', 'pending');
+      .eq('id', contestId)
+      .single()
 
-    if (contestsError) {
-      console.error('Error fetching contests:', contestsError);
-      return new Response(JSON.stringify({ error: 'Failed to fetch contests' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    if (contestError) throw contestError
+    if (!contest) throw new Error('Contest not found')
+
+    // Calculate total prize pool
+    const totalPrizePool = (contest.entry_fee || 0) * (contest.current_participants || 0)
+    console.log('Total prize pool:', totalPrizePool)
+
+    // Get distribution model
+    const { data: distributionModel, error: modelError } = await supabaseClient
+      .from('prize_distribution_models')
+      .select('*')
+      .eq('name', contest.prize_distribution_type)
+      .eq('is_active', true)
+      .single()
+
+    if (modelError) throw modelError
+    if (!distributionModel) throw new Error('Distribution model not found')
+
+    // Get final rankings
+    const { data: rankings, error: rankingsError } = await supabaseClient
+      .rpc('get_contest_leaderboard', { contest_id: contestId })
+
+    if (rankingsError) throw rankingsError
+    if (!rankings || rankings.length === 0) {
+      throw new Error('No rankings found for contest')
     }
 
-    if (!contests || contests.length === 0) {
-      console.log('No contests found for prize distribution.');
-      return new Response(JSON.stringify({ message: 'No contests to process' }), {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
+    console.log('Processing rankings for prize distribution')
 
-    console.log(`Found ${contests.length} contests to process.`);
-
-    for (const contest of contests) {
-      try {
-        // Update contest status to 'in_progress'
-        const { error: updateError } = await supabase
-          .from('contests')
-          .update({ prize_calculation_status: 'in_progress' })
-          .eq('id', contest.id);
-
-        if (updateError) {
-          console.error(`Error updating contest ${contest.id} status:`, updateError);
-          continue; // Move to the next contest
+    // Calculate and distribute prizes
+    const prizeDistribution = new Map()
+    rankings.forEach((ranking, index) => {
+      const rank = (index + 1).toString()
+      const percentage = distributionModel.distribution_rules[rank]
+      
+      if (percentage) {
+        const prizeAmount = Math.floor((totalPrizePool * percentage) / 100)
+        if (prizeAmount > 0) {
+          prizeDistribution.set(ranking.user_id, prizeAmount)
+          console.log(`Calculated prize for rank ${rank}:`, prizeAmount)
         }
+      }
+    })
 
-        console.log(`Calculating prizes for contest: ${contest.id}`);
+    // Distribute prizes to winners
+    for (const [userId, prizeAmount] of prizeDistribution.entries()) {
+      try {
+        // Get current wallet balance
+        const { data: profile, error: profileError } = await supabaseClient
+          .from('profiles')
+          .select('wallet_balance')
+          .eq('id', userId)
+          .single()
 
-        // Call the calculate_prize_distribution function
-        const calculatePrizes = async (contestId: string, totalPrizePool: number, distributionType: string) => {
-          const { data, error } = await supabase.functions.invoke('calculate-prize-distribution', {
-            body: {
-              contestId: contestId,
-              totalPrizePool: totalPrizePool,
-              distributionType: distributionType,
-            },
-          });
+        if (profileError) throw profileError
 
-          if (error) {
-            throw error;
-          }
+        const newBalance = (profile.wallet_balance || 0) + prizeAmount
 
-          return data;
-        };
+        // Create transaction record
+        const { error: transactionError } = await supabaseClient
+          .from('wallet_transactions')
+          .insert({
+            user_id: userId,
+            amount: prizeAmount,
+            type: 'prize_payout',
+            reference_id: contestId,
+            status: 'completed'
+          })
 
-        await calculatePrizes(contest.id, contest.prize_pool, contest.prize_distribution_type);
+        if (transactionError) throw transactionError
 
+        // Update wallet balance
+        const { error: updateError } = await supabaseClient
+          .from('profiles')
+          .update({ wallet_balance: newBalance })
+          .eq('id', userId)
+
+        if (updateError) throw updateError
+        
+        console.log(`Successfully distributed ${prizeAmount} to user ${userId}`)
       } catch (error) {
-        console.error(`Error processing contest ${contest.id}:`, error);
-
-        // Update contest status to 'failed'
-        await supabase
-          .from('contests')
-          .update({ prize_calculation_status: 'failed' })
-          .eq('id', contest.id);
+        console.error(`Error distributing prize to user ${userId}:`, error)
+        throw error
       }
     }
 
-    return new Response(JSON.stringify({ message: 'Prize distribution process completed' }), {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    // Mark contest as completed
+    const { error: updateError } = await supabaseClient
+      .from('contests')
+      .update({ prize_calculation_status: 'completed' })
+      .eq('id', contestId)
+
+    if (updateError) throw updateError
+
+    return new Response(JSON.stringify({ 
+      success: true,
+      message: `Successfully distributed prizes for contest ${contestId}`
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+
   } catch (error) {
-    console.error('Unexpected error:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    console.error('Error in distribute_contest_prizes:', error)
+    return new Response(JSON.stringify({ 
+      success: false, 
+      error: error.message 
+    }), {
       status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
   }
-});
+})

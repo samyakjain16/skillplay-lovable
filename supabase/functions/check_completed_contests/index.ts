@@ -1,145 +1,95 @@
-import { serve } from 'std/server';
-import { differenceInMinutes } from 'date-fns';
 
-async function checkAndHandleCompletedContests() {
-  const supabaseUrl = Deno.env.get('SUPABASE_URL');
-  const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY');
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 
-  if (!supabaseUrl || !supabaseKey) {
-    console.error('Supabase URL or Key not provided in environment variables');
-    return;
-  }
-
-  const now = new Date();
-  const apiUrl = `${supabaseUrl}/rest/v1/contests`;
-
-  try {
-    // Fetch contests that are marked as 'in_progress' but whose end_time has passed
-    const response = await fetch(`${apiUrl}?status=in_progress&end_time=lt.${now.toISOString()}&select=*`, {
-      headers: {
-        'apikey': supabaseKey,
-        'Authorization': `Bearer ${supabaseKey}`,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      console.error('Failed to fetch contests:', response.status, response.statusText);
-      return;
-    }
-
-    const contests = await response.json();
-
-    if (!Array.isArray(contests) || contests.length === 0) {
-      console.log('No contests found that need completion check.');
-      return;
-    }
-
-    console.log(`Found ${contests.length} contests to check.`);
-
-    for (const contest of contests) {
-      try {
-        // Check if prize calculation is already in progress or completed
-        if (contest.prize_calculation_status === 'in_progress' || contest.prize_calculation_status === 'completed') {
-          console.log(`Contest ${contest.id} prize calculation already in progress or completed, skipping.`);
-          continue;
-        }
-
-        // Mark contest as completed
-        const updateResponse = await fetch(`${apiUrl}?id=eq.${contest.id}`, {
-          method: 'PATCH',
-          headers: {
-            'apikey': supabaseKey,
-            'Authorization': `Bearer ${supabaseKey}`,
-            'Content-Type': 'application/json',
-            'Prefer': 'return=minimal', // Suppress the return of updated data
-          },
-          body: JSON.stringify({
-            status: 'completed',
-            prize_calculation_status: 'in_progress',
-          }),
-        });
-
-        if (!updateResponse.ok) {
-          console.error(`Failed to update contest ${contest.id}:`, updateResponse.status, updateResponse.statusText);
-          continue;
-        }
-
-        console.log(`Contest ${contest.id} marked as completed. Starting prize distribution...`);
-
-        // Call the distribute_contest_prizes function
-        const functionUrl = `${supabaseUrl}/functions/v1/distribute_contest_prizes`;
-        const functionResponse = await fetch(functionUrl, {
-          method: 'POST',
-          headers: {
-            'apikey': supabaseKey,
-            'Authorization': `Bearer ${supabaseKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ contestId: contest.id }),
-        });
-
-        if (!functionResponse.ok) {
-          console.error(`Failed to call distribute_contest_prizes for contest ${contest.id}:`, functionResponse.status, functionResponse.statusText);
-
-           // If prize distribution fails, mark contest as failed
-           const failResponse = await fetch(`${apiUrl}?id=eq.${contest.id}`, {
-            method: 'PATCH',
-            headers: {
-              'apikey': supabaseKey,
-              'Authorization': `Bearer ${supabaseKey}`,
-              'Content-Type': 'application/json',
-              'Prefer': 'return=minimal', // Suppress the return of updated data
-            },
-            body: JSON.stringify({
-              prize_calculation_status: 'failed',
-            }),
-          });
-
-          if (!failResponse.ok) {
-            console.error(`Failed to mark contest ${contest.id} as failed:`, failResponse.status, failResponse.statusText);
-          }
-
-          continue;
-        }
-
-        console.log(`Prize distribution started for contest ${contest.id}`);
-      } catch (error) {
-        console.error(`Error processing contest ${contest.id}:`, error);
-
-         // If prize distribution fails, mark contest as failed
-         const failResponse = await fetch(`${apiUrl}?id=eq.${contest.id}`, {
-          method: 'PATCH',
-          headers: {
-            'apikey': supabaseKey,
-            'Authorization': `Bearer ${supabaseKey}`,
-            'Content-Type': 'application/json',
-            'Prefer': 'return=minimal', // Suppress the return of updated data
-          },
-          body: JSON.stringify({
-            prize_calculation_status: 'failed',
-          }),
-        });
-
-        if (!failResponse.ok) {
-          console.error(`Failed to mark contest ${contest.id} as failed after error:`, failResponse.status, failResponse.statusText);
-        }
-      }
-    }
-  } catch (error) {
-    console.error('Failed to check and handle completed contests:', error);
-  }
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-serve(async (req) => {
-  if (req.method === 'POST') {
-    console.log('Running scheduled check for completed contests...');
-    await checkAndHandleCompletedContests();
-    return new Response(JSON.stringify({ message: 'Contest completion check initiated.' }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  } else {
-    return new Response('Method not allowed', { status: 405 });
+Deno.serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders })
   }
-});
+
+  try {
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
+
+    console.log('Checking for completed contests...')
+
+    // First update contest statuses
+    const { error: updateError } = await supabaseClient
+      .rpc('check_and_update_contests')
+
+    if (updateError) {
+      throw updateError
+    }
+
+    // Get contests that need prize distribution
+    const { data: completedContests, error: fetchError } = await supabaseClient
+      .from('contests')
+      .select('id, entry_fee, current_participants, prize_distribution_type')
+      .eq('status', 'completed')
+      .eq('prize_calculation_status', 'in_progress')
+
+    if (fetchError) {
+      throw fetchError
+    }
+
+    console.log(`Found ${completedContests?.length || 0} contests requiring prize distribution`)
+
+    // Process each completed contest
+    for (const contest of completedContests || []) {
+      try {
+        console.log(`Initiating prize distribution for contest ${contest.id}`)
+        
+        // Call the prize distribution function for each contest
+        const response = await fetch(
+          `${Deno.env.get('SUPABASE_URL')}/functions/v1/distribute_contest_prizes`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ contestId: contest.id })
+          }
+        )
+
+        if (!response.ok) {
+          throw new Error(`Failed to distribute prizes for contest ${contest.id}`)
+        }
+
+        console.log(`Successfully processed contest ${contest.id}`)
+      } catch (error) {
+        console.error(`Error processing contest ${contest.id}:`, error)
+        
+        // Mark the contest as failed if prize distribution fails
+        await supabaseClient
+          .from('contests')
+          .update({ prize_calculation_status: 'failed' })
+          .eq('id', contest.id)
+      }
+    }
+
+    return new Response(JSON.stringify({ 
+      success: true,
+      message: `Processed ${completedContests?.length || 0} contests`
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+
+  } catch (error) {
+    console.error('Error in check_completed_contests:', error)
+    return new Response(JSON.stringify({ 
+      success: false, 
+      error: error.message 
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
+})
