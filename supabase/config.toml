@@ -1,1 +1,22 @@
+
 project_id = "dglufhvlbomdqadtthvd"
+
+[api]
+enabled = true
+url = "https://dglufhvlbomdqadtthvd.supabase.co"
+
+[functions]
+node_version = "20"
+
+[[functions.http]]
+path = "/distribute-contest-prizes"
+verify_jwt = false
+
+[[functions.http]]
+path = "/check-completed-contests"
+verify_jwt = false
+
+[[functions.scheduled]]
+name = "check_completed_contests"
+schedule = "*/1 * * * *"  # Run every minute
+path = "/check-completed-contests"
