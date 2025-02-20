@@ -27,7 +27,14 @@ export const useContestState = (
 
   const getGameEndTime = (): Date | null => {
     if (!gameStartTime || timerInitialized.current === false) return null;
-    return new Date(gameStartTime.getTime() + 30000); // 30 seconds from start
+    const endTime = new Date(gameStartTime.getTime() + 30000); // 30 seconds from start
+    const now = new Date();
+    
+    // If more than 30 seconds have passed since game start, end immediately
+    if (now > endTime) {
+      return now;
+    }
+    return endTime;
   };
 
   const updateGameProgress = async () => {
@@ -74,11 +81,26 @@ export const useContestState = (
         return;
       }
 
-      // Only update game start time if it hasn't been set or if it's a new game
-      if (!timerInitialized.current || 
-          !data.user_contests[0].current_game_start_time || 
-          currentGameIndex !== data.user_contests[0].current_game_index) {
+      // Use server's game start time if available
+      const serverGameStartTime = data.user_contests[0].current_game_start_time;
+      
+      if (serverGameStartTime) {
+        const serverStartDate = new Date(serverGameStartTime);
+        const timeDiff = now.getTime() - serverStartDate.getTime();
         
+        // If more than 30 seconds have passed since server start time,
+        // this game should be ended
+        if (timeDiff >= 30000) {
+          console.log("Game time expired based on server time");
+          gameEndInProgress.current = true;
+          return;
+        }
+        
+        // Use server's start time to maintain consistency
+        setGameStartTime(serverStartDate);
+        timerInitialized.current = true;
+      } else if (!timerInitialized.current || currentGameIndex !== data.user_contests[0].current_game_index) {
+        // Only set new start time if timer isn't initialized or it's a new game
         setCurrentGameIndex(data.user_contests[0].current_game_index);
         setGameStartTime(now);
         timerInitialized.current = true;
