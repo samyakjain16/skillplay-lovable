@@ -138,6 +138,20 @@ export async function distributePrizes(
 ): Promise<void> {
   for (const [userId, prizeAmount] of prizeDistribution.entries()) {
     try {
+      // First get current wallet balance
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('wallet_balance')
+        .eq('id', userId)
+        .single();
+
+      if (profileError) {
+        console.error('Error fetching current balance:', profileError);
+        continue;
+      }
+
+      const newBalance = (profile.wallet_balance || 0) + prizeAmount;
+
       // Create transaction record first
       const { data: transaction, error: transactionError } = await supabase
         .from('wallet_transactions')
@@ -156,12 +170,10 @@ export async function distributePrizes(
         continue;
       }
 
-      // Update wallet balance using SQL template
+      // Update wallet balance with new calculated value
       const { error: updateError } = await supabase
         .from('profiles')
-        .update({
-          wallet_balance: `wallet_balance + ${prizeAmount}`
-        })
+        .update({ wallet_balance: newBalance })
         .eq('id', userId);
 
       if (updateError) {
