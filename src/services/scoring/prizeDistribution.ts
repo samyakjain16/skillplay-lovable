@@ -1,51 +1,10 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { PrizeDistributionModel, DatabasePrizeModel } from "./types";
+import { getPrizeDistributionModels } from "./cache/distributionModelsCache";
+import { distributePrizes } from "./wallet/prizeDistribution";
 
-// In-memory cache
-let distributionModelsCache: Map<string, PrizeDistributionModel> | null = null;
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-let lastCacheUpdate = 0;
-
-export async function getPrizeDistributionModels() {
-  const now = Date.now();
-  
-  if (distributionModelsCache && (now - lastCacheUpdate) < CACHE_DURATION) {
-    return distributionModelsCache;
-  }
-
-  const { data: models, error } = await supabase
-    .from('prize_distribution_models')
-    .select('*')
-    .eq('is_active', true);
-
-  if (error) {
-    console.error('Error fetching prize distribution models:', error);
-    if (distributionModelsCache) return distributionModelsCache;
-    throw error;
-  }
-
-  // Transform database models to application models
-  distributionModelsCache = new Map(
-    (models as DatabasePrizeModel[]).map(model => {
-      // Handle both string and JSONB types from database
-      const rules = typeof model.distribution_rules === 'string' 
-        ? JSON.parse(model.distribution_rules)
-        : model.distribution_rules;
-
-      return [
-        model.name,
-        {
-          ...model,
-          distribution_rules: rules
-        }
-      ];
-    })
-  );
-  lastCacheUpdate = now;
-
-  return distributionModelsCache;
-}
+export { getPrizeDistributionModels } from "./cache/distributionModelsCache";
+export { distributePrizes } from "./wallet/prizeDistribution";
 
 export async function calculatePrizeDistribution(
   contestId: string,
@@ -129,63 +88,5 @@ export async function calculatePrizeDistribution(
       .update({ prize_calculation_status: 'failed' })
       .eq('id', contestId);
     throw error;
-  }
-}
-
-export async function distributePrizes(
-  contestId: string,
-  prizeDistribution: Map<string, number>
-): Promise<void> {
-  for (const [userId, prizeAmount] of prizeDistribution.entries()) {
-    try {
-      // First get current wallet balance
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('wallet_balance')
-        .eq('id', userId)
-        .single();
-
-      if (profileError) {
-        console.error('Error fetching current balance:', profileError);
-        continue;
-      }
-
-      const newBalance = (profile.wallet_balance || 0) + prizeAmount;
-
-      // Create transaction record first
-      const { data: transaction, error: transactionError } = await supabase
-        .from('wallet_transactions')
-        .insert({
-          user_id: userId,
-          amount: prizeAmount,
-          type: 'prize_payout',
-          reference_id: contestId,
-          status: 'completed'
-        })
-        .select()
-        .single();
-
-      if (transactionError) {
-        console.error('Error creating transaction record:', transactionError);
-        continue;
-      }
-
-      // Update wallet balance with new calculated value
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ wallet_balance: newBalance })
-        .eq('id', userId);
-
-      if (updateError) {
-        console.error('Error updating wallet balance:', updateError);
-        // If wallet update fails, mark transaction as failed
-        await supabase
-          .from('wallet_transactions')
-          .update({ status: 'failed' })
-          .eq('id', transaction.id);
-      }
-    } catch (error) {
-      console.error('Error distributing prize to user:', userId, error);
-    }
   }
 }
