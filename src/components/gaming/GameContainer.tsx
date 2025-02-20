@@ -38,6 +38,7 @@ export const GameContainer = ({
     currentGameIndex,
     setCurrentGameIndex,
     gameStartTime,
+    setGameStartTime,
     hasRedirected,
     getGameEndTime,
     updateGameProgress,
@@ -69,6 +70,8 @@ export const GameContainer = ({
         console.log("Game already completed, moving to next game");
         if (!isFinalGame) {
           setCurrentGameIndex(currentUserContest.current_game_index);
+          // Reset game start time for the next game
+          setGameStartTime(new Date());
           updateGameProgress();
         }
         gameEndInProgress.current = false;
@@ -118,6 +121,8 @@ export const GameContainer = ({
           console.log("Game already completed, moving to next game");
           if (!isFinalGame) {
             setCurrentGameIndex(prev => prev + 1);
+            // Reset game start time for the next game
+            setGameStartTime(new Date());
             updateGameProgress();
           }
           gameEndInProgress.current = false;
@@ -131,6 +136,8 @@ export const GameContainer = ({
       
       if (!isFinalGame) {
         setCurrentGameIndex(prev => prev + 1);
+        // Reset game start time for the next game
+        setGameStartTime(new Date());
       }
 
     } catch (error) {
