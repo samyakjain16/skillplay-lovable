@@ -51,12 +51,26 @@ export const AvailableContests = () => {
       }
 
       // Transform the data to ensure status is one of the allowed values
-      return (data ?? []).map(contest => ({
-        ...contest,
-        status: contest.status as Contest['status'],
-        contest_type: contest.contest_type as Contest['contest_type'],
-        prize_calculation_status: contest.prize_calculation_status || 'pending'
-      }));
+      return (data ?? []).map(contest => {
+        const calculationStatus = contest.prize_calculation_status as Contest['prize_calculation_status'] || 'pending';
+        return {
+          ...contest,
+          status: contest.status as Contest['status'],
+          contest_type: contest.contest_type as Contest['contest_type'],
+          prize_calculation_status: calculationStatus,
+          // Ensure all required properties are present with correct types
+          title: contest.title || '',
+          description: contest.description || '',
+          start_time: contest.start_time || '',
+          end_time: contest.end_time || '',
+          entry_fee: contest.entry_fee || 0,
+          prize_pool: contest.prize_pool || 0,
+          current_participants: contest.current_participants || 0,
+          max_participants: contest.max_participants || 0,
+          prize_distribution_type: contest.prize_distribution_type || '',
+          series_count: contest.series_count || 0
+        } satisfies Contest;
+      });
     },
   });
 
