@@ -56,7 +56,7 @@ export const GameContainer = ({
     const now = new Date().toISOString();
 
     try {
-      // Calculate new total score by adding current game score
+      // Get current server state
       const { data: currentUserContest } = await supabase
         .from('user_contests')
         .select('score, current_game_index')
@@ -64,28 +64,30 @@ export const GameContainer = ({
         .eq('user_id', user.id)
         .single();
 
-      // If the current game index in the database is ahead of our local state,
-      // it means this game was already completed (possibly by the timer)
-      if (currentUserContest && currentUserContest.current_game_index > currentGameIndex) {
-        console.log("Game already completed, moving to next game");
-        if (!isFinalGame) {
-          setCurrentGameIndex(currentUserContest.current_game_index);
-          // Reset game start time for the next game
-          setGameStartTime(new Date());
-          updateGameProgress();
-        }
+      if (!currentUserContest) {
+        throw new Error("User contest not found");
+      }
+
+      // Always use server's game index for validation
+      const serverGameIndex = currentUserContest.current_game_index;
+      
+      // If server index is different, sync with it
+      if (serverGameIndex !== currentGameIndex) {
+        console.log("Syncing with server game index:", serverGameIndex);
+        setCurrentGameIndex(serverGameIndex);
         gameEndInProgress.current = false;
         return;
       }
 
-      const previousScore = currentUserContest?.score || 0;
+      const previousScore = currentUserContest.score || 0;
       const newTotalScore = previousScore + score;
+      const nextGameIndex = isFinalGame ? currentGameIndex : currentGameIndex + 1;
 
       // Update user_contests with accumulated score and progress
       const { error: updateError } = await supabase
         .from('user_contests')
         .update({
-          current_game_index: isFinalGame ? currentGameIndex : currentGameIndex + 1,
+          current_game_index: nextGameIndex,
           current_game_score: score,
           current_game_start_time: null,
           status: isFinalGame ? 'completed' : 'active',
@@ -118,25 +120,17 @@ export const GameContainer = ({
 
       if (progressError) {
         if (progressError.code === '23505') { // Unique violation
-          console.log("Game already completed, moving to next game");
-          if (!isFinalGame) {
-            setCurrentGameIndex(prev => prev + 1);
-            // Reset game start time for the next game
-            setGameStartTime(new Date());
-            updateGameProgress();
-          }
-          gameEndInProgress.current = false;
-          return;
+          console.log("Game progress already recorded");
+        } else {
+          throw progressError;
         }
-        throw progressError;
       }
 
       await refetchCompletedGames();
       onGameComplete(score, isFinalGame);
-      
+
       if (!isFinalGame) {
-        setCurrentGameIndex(prev => prev + 1);
-        // Reset game start time for the next game
+        setCurrentGameIndex(nextGameIndex);
         setGameStartTime(new Date());
       }
 
