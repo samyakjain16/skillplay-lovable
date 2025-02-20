@@ -1,3 +1,4 @@
+
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
@@ -147,13 +148,17 @@ export const MyContests = () => {
     );
   }
 
+  const handleStartContest = async (contestId: string): Promise<void> => {
+    await startContestMutation.mutateAsync(contestId);
+  };
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {contests.map((participation) => (
         <ContestCard
           key={participation.id}
           contest={participation.contest}
-          onStart={(contestId) => startContestMutation.mutate(contestId)}
+          onStart={handleStartContest}
           isStarting={startContestMutation.isPending}
           isInMyContests={true}
         />
