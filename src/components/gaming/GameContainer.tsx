@@ -10,6 +10,7 @@ import { GameContent } from "./GameContent";
 import { ContestCompletionHandler } from "./ContestCompletionHandler";
 import { GameInitializer } from "./GameInitializer";
 import { supabase } from "@/integrations/supabase/client";
+import { GameTimeSlot } from "@/components/contest/types";
 
 interface GameContainerProps {
   contestId: string;
@@ -34,8 +35,8 @@ export const GameContainer = ({
   const {
     currentGameIndex,
     setCurrentGameIndex,
-    gameStartTime,
-    setGameStartTime,
+    gameTimeSlot,
+    setGameTimeSlot,
     getGameEndTime,
     updateGameProgress,
     toast,
@@ -48,7 +49,7 @@ export const GameContainer = ({
 
     gameEndInProgress.current = true;
     const currentGame = contestGames[currentGameIndex];
-    const timeSpent = gameStartTime ? Math.floor((Date.now() - gameStartTime.getTime()) / 1000) : 30;
+    const timeSpent = gameTimeSlot ? Math.floor((new Date(gameTimeSlot.end_time).getTime() - new Date(gameTimeSlot.start_time).getTime()) / 1000) : 30;
     const isFinalGame = currentGameIndex === contestGames.length - 1;
     const now = new Date().toISOString();
 
@@ -96,7 +97,7 @@ export const GameContainer = ({
           game_content_id: currentGame.game_content_id,
           score: score,
           time_taken: timeSpent,
-          started_at: gameStartTime?.toISOString(),
+          started_at: gameTimeSlot?.start_time,
           completed_at: now,
           is_correct: score > 0
         });
@@ -106,7 +107,8 @@ export const GameContainer = ({
       
       if (!isFinalGame) {
         setCurrentGameIndex(prev => prev + 1);
-        setGameStartTime(new Date());
+        setGameTimeSlot(null);
+        updateGameProgress();
       }
 
     } catch (error) {
@@ -123,7 +125,7 @@ export const GameContainer = ({
 
   // Auto-end game when time expires
   useEffect(() => {
-    if (!gameStartTime) return;
+    if (!gameTimeSlot) return;
 
     const timeoutId = setTimeout(() => {
       if (!gameEndInProgress.current) {
@@ -132,7 +134,7 @@ export const GameContainer = ({
     }, getGameEndTime()?.getTime() - Date.now());
 
     return () => clearTimeout(timeoutId);
-  }, [gameStartTime]);
+  }, [gameTimeSlot]);
 
   // Regular progress updates
   useEffect(() => {
@@ -194,6 +196,7 @@ export const GameContainer = ({
         totalGames={contestGames.length}
         gameEndTime={getGameEndTime()}
         onGameEnd={handleGameEnd}
+        gameTimeSlot={gameTimeSlot}
       />
     </>
   );

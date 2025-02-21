@@ -13,4 +13,11 @@ export interface ContestData {
   status: string;
   prize_pool: number;
   prize_distribution_type: string;
+  series_count: number;
 }
+
+export interface GameTimeSlot {
+  start_time: string;
+  end_time: string;
+}
+

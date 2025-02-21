@@ -1,3 +1,4 @@
+
 import { Card } from "@/components/ui/card";
 import { CountdownTimer } from "./CountdownTimer";
 import { ArrangeSortGame } from "./games/ArrangeSortGame";
@@ -6,6 +7,7 @@ import { SpotDifferenceGame } from "./games/SpotDifferenceGame";
 import { useEffect, useRef } from "react";
 import { calculateGameScore } from "@/services/scoring/scoringRules";
 import { Loader2 } from "lucide-react";
+import { GameTimeSlot } from "@/components/contest/types";
 
 interface GameContentProps {
   currentGame: any;
@@ -13,6 +15,7 @@ interface GameContentProps {
   totalGames: number;
   gameEndTime: Date | null;
   onGameEnd: (score: number) => void;
+  gameTimeSlot: GameTimeSlot | null;
 }
 
 export const GameContent = ({
@@ -20,7 +23,8 @@ export const GameContent = ({
   currentGameIndex,
   totalGames,
   gameEndTime,
-  onGameEnd
+  onGameEnd,
+  gameTimeSlot
 }: GameContentProps) => {
   const gameEndInProgress = useRef(false);
 
@@ -53,10 +57,11 @@ export const GameContent = ({
 
   // Calculate remaining time for CountdownTimer
   const getRemainingSeconds = (): number | undefined => {
-    if (!gameEndTime) return undefined;
+    if (!gameTimeSlot) return undefined;
     
     const now = new Date();
-    const remainingMs = gameEndTime.getTime() - now.getTime();
+    const endTime = new Date(gameTimeSlot.end_time);
+    const remainingMs = endTime.getTime() - now.getTime();
     return Math.max(0, Math.ceil(remainingMs / 1000));
   };
 
@@ -76,9 +81,10 @@ export const GameContent = ({
     }
 
     // Validate time taken against game end time
-    if (gameEndTime) {
+    if (gameTimeSlot) {
       const now = new Date();
-      if (now > gameEndTime) {
+      const endTime = new Date(gameTimeSlot.end_time);
+      if (now > endTime) {
         onGameEnd(0);
         return;
       }
@@ -156,11 +162,11 @@ export const GameContent = ({
         <h3 className="text-lg font-semibold">
           Game {currentGameIndex + 1} of {totalGames}
         </h3>
-        {gameEndTime && (
+        {gameTimeSlot && (
           <div className="text-sm font-medium">
             Time Remaining: {" "}
             <CountdownTimer 
-              targetDate={gameEndTime} 
+              targetDate={new Date(gameTimeSlot.end_time)}
               initialTimeLeft={getRemainingSeconds()}
               onEnd={() => {
                 if (!gameEndInProgress.current) {
