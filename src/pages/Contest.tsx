@@ -1,14 +1,14 @@
+
 import { useEffect, useState } from "react";
 import { Navigation } from "@/components/Navigation";
-import { Card, CardContent } from "@/components/ui/card";
 import { useNavigate, useParams } from "react-router-dom";
-import { Timer, Trophy, MessageSquare, ArrowLeft } from "lucide-react";
-import { GameContainer } from "@/components/gaming/GameContainer";
 import { useToast } from "@/components/ui/use-toast";
-import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ContestPageHeader } from "@/components/contest/ContestPageHeader";
+import { ContestGameSection } from "@/components/contest/ContestGameSection";
+import { ContestSidebar } from "@/components/contest/ContestSidebar";
 
 const Contest = () => {
   const { id } = useParams();
@@ -54,20 +54,17 @@ const Contest = () => {
     enabled: !!user && !!id
   });
 
-  // Check if contest is accessible
   useEffect(() => {
     if (!contest || !user) return;
 
     const now = new Date();
     const endTime = new Date(contest.end_time);
     
-    // Redirect to leaderboard if contest is completed or ended
     if (contest.status === 'completed' || now > endTime) {
       navigate(`/contest/${id}/leaderboard`, { replace: true });
       return;
     }
 
-    // Set initial states from contest progress
     if (contestProgress) {
       setTotalScore(contestProgress.score || 0);
       setIsCompleted(contestProgress.status === 'completed');
@@ -84,13 +81,12 @@ const Contest = () => {
       if (isFinalGame) {
         setIsCompleted(true);
 
-        // Update user_contests with final state
         const { error: updateError } = await supabase
           .from('user_contests')
           .update({ 
             status: 'completed',
             score: newTotalScore,
-            current_game_index: contest.series_count - 1, // Set to last game
+            current_game_index: contest.series_count - 1,
             current_game_score: score,
             completed_at: new Date().toISOString()
           })
@@ -99,13 +95,11 @@ const Contest = () => {
 
         if (updateError) throw updateError;
 
-        // Show completion message
         toast({
           title: "Contest Completed!",
           description: `Your final score is ${newTotalScore}. Results will be available when the contest ends.`,
         });
 
-        // Invalidate relevant queries
         queryClient.invalidateQueries({ queryKey: ["contest-progress"] });
         queryClient.invalidateQueries({ queryKey: ["my-contests"] });
       }
@@ -154,87 +148,26 @@ const Contest = () => {
       
       <main className="container mx-auto px-4 py-8">
         <div className="max-w-6xl mx-auto">
-          <div className="mb-8 flex items-center justify-between">
-            <div>
-              <Button
-                variant="ghost"
-                onClick={handleReturnToGaming}
-                className="mb-4"
-              >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Gaming
-              </Button>
-              <h1 className="text-3xl font-bold">
-                {isCompleted ? "Contest Completed" : "Contest in Progress"}
-              </h1>
-              <p className="text-muted-foreground mt-1">{contest.title}</p>
-            </div>
-          </div>
+          <ContestPageHeader 
+            title={contest.title}
+            isCompleted={isCompleted}
+            onReturn={handleReturnToGaming}
+          />
 
           <div className="grid md:grid-cols-3 gap-6">
-            <div className="md:col-span-2">
-              {isCompleted ? (
-                <Card>
-                  <CardContent className="p-6 text-center">
-                    <Trophy className="w-16 h-16 text-primary mx-auto mb-4" />
-                    <h2 className="text-2xl font-bold mb-4">Congratulations!</h2>
-                    <p className="text-lg mb-6">You've completed all games in this contest.</p>
-                    <p className="text-xl font-semibold mb-8">Final Score: {totalScore}</p>
-                    <Button onClick={handleReturnToGaming}>
-                      Return to Gaming
-                    </Button>
-                  </CardContent>
-                </Card>
-              ) : (
-                <GameContainer 
-                  contestId={id}
-                  onGameComplete={handleGameComplete}
-                  initialProgress={contestProgress}
-                />
-              )}
-            </div>
-
-            <div className="space-y-6">
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-2 mb-4">
-                    <Trophy className="w-5 h-5 text-primary" />
-                    <h3 className="font-semibold">Current Score</h3>
-                  </div>
-                  <p className="text-2xl font-bold">{totalScore}</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-2 mb-4">
-                    <MessageSquare className="w-5 h-5 text-primary" />
-                    <h3 className="font-semibold">Game Information</h3>
-                  </div>
-                  <div className="space-y-2 text-sm">
-                    <p>• Each game lasts 30 seconds</p>
-                    <p>• Total games: {contest.series_count}</p>
-                    <p>• Points are awarded based on speed and accuracy</p>
-                    <p>• Complete all games to finish the contest</p>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {contest.prize_pool > 0 && (
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-2 mb-4">
-                      <Trophy className="w-5 h-5 text-primary" />
-                      <h3 className="font-semibold">Prize Pool</h3>
-                    </div>
-                    <p className="text-2xl font-bold">${contest.prize_pool}</p>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Distribution: {contest.prize_distribution_type}
-                    </p>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
+            <ContestGameSection 
+              isCompleted={isCompleted}
+              totalScore={totalScore}
+              contestId={id!}
+              onGameComplete={handleGameComplete}
+              contestProgress={contestProgress}
+              onReturn={handleReturnToGaming}
+            />
+            
+            <ContestSidebar 
+              totalScore={totalScore}
+              contest={contest}
+            />
           </div>
         </div>
       </main>
