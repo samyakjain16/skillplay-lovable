@@ -43,11 +43,12 @@ export const GameContent = ({
     }
 
     try {
-      const score = await calculateScore(
-        currentGame.game_content.category,
+      const score = await calculateScore({
+        category: currentGame.game_content.category,
+        isCorrect: true, // We know it's correct at this point
         timeTaken,
         additionalData
-      );
+      });
       onGameEnd(score);
     } catch (error) {
       console.error('Error calculating game score:', error);

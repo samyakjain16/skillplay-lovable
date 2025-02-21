@@ -3,7 +3,7 @@ import { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { QueryObserverResult, RefetchOptions } from "@tanstack/react-query";
 import type { Game } from "./hooks/types/gameTypes";
-import { type Toast } from "@/hooks/use-toast";
+import { type ToastProps } from "@/components/ui/toast";
 
 interface GameStateHandlerProps {
   user: User | null;
@@ -16,7 +16,7 @@ interface GameStateHandlerProps {
   setGameStartTime: (time: Date | null) => void;
   onGameComplete: (score: number, isFinalGame: boolean) => void;
   refetchCompletedGames: (options?: RefetchOptions) => Promise<QueryObserverResult<number, Error>>;
-  toast: (props: Toast) => void;
+  toast: (props: Partial<ToastProps>) => void;
 }
 
 export const GameStateHandler = ({

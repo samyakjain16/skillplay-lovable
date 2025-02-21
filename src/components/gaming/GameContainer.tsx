@@ -1,4 +1,3 @@
-
 import { Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -32,6 +31,7 @@ interface Contest {
   status: 'active' | 'completed';
   series_count: number;
   end_time: string;
+  start_time: string;
 }
 
 export const GameContainer = ({ 
