@@ -31,22 +31,45 @@ export const ContestStatusButton = ({
   const gameCheckIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const queryClient = useQueryClient();
 
-  // Function to fetch current game number
-  const fetchCurrentGameNumber = async () => {
+  const fetchGameNumber = async () => {
     if (!user || !isInMyContests) return;
 
     try {
-      const { data, error } = await supabase
-        .from('user_contests')
-        .select('current_game_index')
-        .eq('contest_id', contest.id)
-        .eq('user_id', user.id)
-        .single();
+      // Get contest start time and user's progress
+      const { data: contestData } = await supabase
+        .from('contests')
+        .select(`
+          start_time,
+          user_contests!inner (
+            current_game_index,
+            completed_games,
+            current_game_start_time
+          )
+        `)
+        .eq('id', contest.id)
+        .eq('user_contests.user_id', user.id);
 
-      if (error) throw error;
+      if (!contestData || contestData.length === 0) return;
+
+      const userContest = contestData[0].user_contests[0];
+      const completedGames = userContest.completed_games || [];
       
-      if (data) {
-        setCurrentGameNumber(data.current_game_index + 1); // Add 1 for display purposes
+      // Calculate time-based game number
+      const contestStartTime = new Date(contestData[0].start_time);
+      const now = new Date();
+      const elapsedSeconds = Math.floor((now.getTime() - contestStartTime.getTime()) / 1000);
+      const timeBasedGameNumber = Math.floor(elapsedSeconds / 30) + 1; // +1 for display
+
+      // Calculate effective game number based on completed games and current index
+      const gameFromIndex = userContest.current_game_index + 1;
+      const gameFromCompleted = completedGames.length + 1;
+      
+      // Use the maximum of all calculations
+      const effectiveGameNumber = Math.max(timeBasedGameNumber, gameFromIndex, gameFromCompleted);
+      
+      // Only update if it's within the series count
+      if (effectiveGameNumber <= contest.series_count) {
+        setCurrentGameNumber(effectiveGameNumber);
       }
     } catch (error) {
       console.error('Error fetching game number:', error);
@@ -54,12 +77,10 @@ export const ContestStatusButton = ({
   };
 
   useEffect(() => {
-    // Initial fetch
-    fetchCurrentGameNumber();
-
-    // Set up interval to check game number
+    fetchGameNumber();
+    
     if (isInMyContests && contest.status === "in_progress") {
-      gameCheckIntervalRef.current = setInterval(fetchCurrentGameNumber, 5000);
+      gameCheckIntervalRef.current = setInterval(fetchGameNumber, 5000);
     }
 
     return () => {
@@ -68,17 +89,6 @@ export const ContestStatusButton = ({
       }
     };
   }, [isInMyContests, contest.status, contest.id, user?.id]);
-
-  const handleClick = async () => {
-    if (loading || buttonState.disabled) return;
-    
-    setLocalLoading(true);
-    try {
-      await onClick?.();
-    } finally {
-      setLocalLoading(false);
-    }
-  };
 
   useEffect(() => {
     const updateProgress = () => {
@@ -115,6 +125,17 @@ export const ContestStatusButton = ({
     };
   }, [contest.status, contest.id, contest.start_time, contest.end_time, queryClient]);
 
+  const handleClick = async () => {
+    if (loading || buttonState.disabled) return;
+    
+    setLocalLoading(true);
+    try {
+      await onClick?.();
+    } finally {
+      setLocalLoading(false);
+    }
+  };
+
   let buttonText = "Join Contest";
   if (!isInMyContests && contest.contest_type === 'fixed_participants') {
     buttonText = `Join (${contest.current_participants}/${contest.max_participants})`;
@@ -128,7 +149,6 @@ export const ContestStatusButton = ({
     customClass: "bg-green-500 hover:bg-green-600 text-white"
   };
 
-  // Modify button state based on contest conditions
   if (isInMyContests) {
     const isWaitingForPlayers = 
       contest.contest_type === 'fixed_participants' && 
@@ -147,7 +167,6 @@ export const ContestStatusButton = ({
       buttonState.disabled = true;
       buttonState.customClass = "bg-blue-600 text-white";
     } else if (contest.status === "in_progress") {
-      // Show current game number if available
       buttonState.text = currentGameNumber 
         ? `Continue Game ${currentGameNumber}/${contest.series_count}`
         : "Continue Playing";
