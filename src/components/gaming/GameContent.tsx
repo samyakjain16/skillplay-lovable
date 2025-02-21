@@ -1,10 +1,9 @@
-
 import { Card } from "@/components/ui/card";
 import { CountdownTimer } from "./CountdownTimer";
 import { ArrangeSortGame } from "./games/ArrangeSortGame";
 import { TriviaGame } from "./games/TriviaGame";
 import { SpotDifferenceGame } from "./games/SpotDifferenceGame";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { calculateGameScore } from "@/services/scoring/scoringRules";
 import { Loader2 } from "lucide-react";
 
@@ -23,27 +22,66 @@ export const GameContent = ({
   gameEndTime,
   onGameEnd
 }: GameContentProps) => {
+  const gameEndInProgress = useRef(false);
+
   // Effect to handle game end when time runs out
   useEffect(() => {
     if (!gameEndTime) return;
 
-    const timeoutId = setTimeout(() => {
-      // When time runs out, submit with score 0
-      onGameEnd(0);
-    }, gameEndTime.getTime() - new Date().getTime());
+    const now = new Date();
+    const remainingTime = gameEndTime.getTime() - now.getTime();
 
-    return () => clearTimeout(timeoutId);
+    // If already past end time, end immediately
+    if (remainingTime <= 0 && !gameEndInProgress.current) {
+      gameEndInProgress.current = true;
+      onGameEnd(0);
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      if (!gameEndInProgress.current) {
+        gameEndInProgress.current = true;
+        onGameEnd(0);
+      }
+    }, remainingTime);
+
+    return () => {
+      clearTimeout(timeoutId);
+      gameEndInProgress.current = false;
+    };
   }, [gameEndTime, onGameEnd]);
+
+  // Calculate remaining time for CountdownTimer
+  const getRemainingSeconds = (): number | undefined => {
+    if (!gameEndTime) return undefined;
+    
+    const now = new Date();
+    const remainingMs = gameEndTime.getTime() - now.getTime();
+    return Math.max(0, Math.ceil(remainingMs / 1000));
+  };
 
   const handleGameComplete = async (
     isCorrect: boolean,
     timeTaken: number,
     additionalData?: Record<string, any>
   ) => {
+    if (gameEndInProgress.current) {
+      return; // Prevent multiple submissions
+    }
+
     if (!currentGame?.game_content?.category) {
       console.error('Game content or category is missing');
       onGameEnd(0);
       return;
+    }
+
+    // Validate time taken against game end time
+    if (gameEndTime) {
+      const now = new Date();
+      if (now > gameEndTime) {
+        onGameEnd(0);
+        return;
+      }
     }
 
     // If answer is incorrect, immediately return 0 score
@@ -53,6 +91,7 @@ export const GameContent = ({
     }
 
     try {
+      gameEndInProgress.current = true;
       const score = await calculateGameScore(
         currentGame.game_content.category,
         isCorrect,
@@ -76,29 +115,22 @@ export const GameContent = ({
       );
     }
 
+    // Common props for all game types
+    const gameProps = {
+      content: game.game_content.content,
+      onComplete: (isCorrect: boolean, timeTaken: number, data?: Record<string, any>) => 
+        handleGameComplete(isCorrect, timeTaken, data),
+      remainingTime: getRemainingSeconds(),
+      isActive: !gameEndInProgress.current && !!gameEndTime
+    };
+
     switch (game.game_content.category) {
       case 'arrange_sort':
-        return (
-          <ArrangeSortGame
-            content={game.game_content.content}
-            onComplete={(isCorrect, timeTaken) => handleGameComplete(isCorrect, timeTaken)}
-          />
-        );
+        return <ArrangeSortGame {...gameProps} />;
       case 'trivia':
-        return (
-          <TriviaGame
-            content={game.game_content.content}
-            onComplete={(isCorrect, timeTaken) => handleGameComplete(isCorrect, timeTaken)}
-          />
-        );
+        return <TriviaGame {...gameProps} />;
       case 'spot_difference':
-        return (
-          <SpotDifferenceGame
-            content={game.game_content.content}
-            onComplete={(isCorrect, timeTaken, data) => 
-              handleGameComplete(isCorrect, timeTaken, data)}
-          />
-        );
+        return <SpotDifferenceGame {...gameProps} />;
       default:
         return (
           <div className="text-center py-8">
@@ -126,7 +158,17 @@ export const GameContent = ({
         </h3>
         {gameEndTime && (
           <div className="text-sm font-medium">
-            Time Remaining: <CountdownTimer targetDate={gameEndTime} onEnd={() => onGameEnd(0)} />
+            Time Remaining: {" "}
+            <CountdownTimer 
+              targetDate={gameEndTime} 
+              initialTimeLeft={getRemainingSeconds()}
+              onEnd={() => {
+                if (!gameEndInProgress.current) {
+                  gameEndInProgress.current = true;
+                  onGameEnd(0);
+                }
+              }} 
+            />
           </div>
         )}
       </div>

@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
@@ -6,6 +5,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { getTimeStatus } from "./utils/contestButtonUtils";
 import { ContestProgressBar } from "./ContestProgressBar";
 import { type Contest } from "./ContestTypes";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 interface ContestStatusButtonProps {
   contest: Pick<Contest, "id" | "status" | "start_time" | "end_time" | "current_participants" | "max_participants" | "series_count" | "contest_type">;
@@ -22,10 +23,51 @@ export const ContestStatusButton = ({
   isInMyContests,
   userCompletedGames 
 }: ContestStatusButtonProps) => {
+  const { user } = useAuth();
   const [localLoading, setLocalLoading] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [currentGameNumber, setCurrentGameNumber] = useState<number | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const gameCheckIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const queryClient = useQueryClient();
+
+  // Function to fetch current game number
+  const fetchCurrentGameNumber = async () => {
+    if (!user || !isInMyContests) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('user_contests')
+        .select('current_game_index')
+        .eq('contest_id', contest.id)
+        .eq('user_id', user.id)
+        .single();
+
+      if (error) throw error;
+      
+      if (data) {
+        setCurrentGameNumber(data.current_game_index + 1); // Add 1 for display purposes
+      }
+    } catch (error) {
+      console.error('Error fetching game number:', error);
+    }
+  };
+
+  useEffect(() => {
+    // Initial fetch
+    fetchCurrentGameNumber();
+
+    // Set up interval to check game number
+    if (isInMyContests && contest.status === "in_progress") {
+      gameCheckIntervalRef.current = setInterval(fetchCurrentGameNumber, 5000);
+    }
+
+    return () => {
+      if (gameCheckIntervalRef.current) {
+        clearInterval(gameCheckIntervalRef.current);
+      }
+    };
+  }, [isInMyContests, contest.status, contest.id, user?.id]);
 
   const handleClick = async () => {
     if (loading || buttonState.disabled) return;
@@ -105,7 +147,10 @@ export const ContestStatusButton = ({
       buttonState.disabled = true;
       buttonState.customClass = "bg-blue-600 text-white";
     } else if (contest.status === "in_progress") {
-      buttonState.text = "Continue Playing";
+      // Show current game number if available
+      buttonState.text = currentGameNumber 
+        ? `Continue Game ${currentGameNumber}/${contest.series_count}`
+        : "Continue Playing";
       buttonState.customClass = "bg-blue-500 hover:bg-blue-600 text-white";
     } else {
       buttonState.text = "Start Playing";

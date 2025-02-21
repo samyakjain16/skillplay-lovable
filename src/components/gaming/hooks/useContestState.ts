@@ -1,9 +1,10 @@
-
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
+
+const GAME_DURATION_MS = 30 * 1000; // 30 seconds in milliseconds
 
 export const useContestState = (
   contestId: string,
@@ -28,15 +29,15 @@ export const useContestState = (
   const getGameEndTime = (): Date | null => {
     if (!gameStartTime) return null;
 
-    // Calculate the original end time (30 seconds from when the game started)
-    const originalEndTime = new Date(gameStartTime.getTime() + (30 * 1000));
+    const now = new Date();
+    const originalEndTime = new Date(gameStartTime.getTime() + GAME_DURATION_MS);
     
     // If we're past the end time, return null to trigger game end
-    if (new Date() > originalEndTime) {
+    if (now > originalEndTime) {
       return null;
     }
 
-    // Return the original end time
+    // Return the actual remaining time
     return originalEndTime;
   };
 
@@ -56,7 +57,8 @@ export const useContestState = (
           user_contests!inner (
             status,
             current_game_index,
-            current_game_start_time
+            current_game_start_time,
+            current_game_score
           )
         `)
         .eq('id', contestId)
@@ -73,6 +75,7 @@ export const useContestState = (
         return;
       }
 
+      // Handle contest completion states
       if (data.status === 'completed') {
         navigate(`/contest/${contestId}/leaderboard`);
         return;
@@ -83,35 +86,50 @@ export const useContestState = (
         return;
       }
 
-      // Set the current game index from the database
-      setCurrentGameIndex(data.user_contests[0].current_game_index);
+      const userContest = data.user_contests[0];
+      
+      // Update current game index from server
+      setCurrentGameIndex(userContest.current_game_index);
 
-      // If there's no start time or it's a new game, initialize it
+      // Handle game start time synchronization
       if (!timerInitialized.current || 
-          !data.user_contests[0].current_game_start_time || 
-          currentGameIndex !== data.user_contests[0].current_game_index) {
+          !userContest.current_game_start_time || 
+          currentGameIndex !== userContest.current_game_index) {
         
-        const serverStartTime = data.user_contests[0].current_game_start_time
-          ? new Date(data.user_contests[0].current_game_start_time)
-          : new Date();
+        let newStartTime: Date;
+        
+        if (userContest.current_game_start_time) {
+          // For late-joining players, use the existing start time
+          newStartTime = new Date(userContest.current_game_start_time);
+          
+          // If the game should have ended already, trigger immediate end
+          const now = new Date();
+          const endTime = new Date(newStartTime.getTime() + GAME_DURATION_MS);
+          if (now > endTime && !gameEndInProgress.current) {
+            gameEndInProgress.current = true;
+            // End the game with the saved score or 0
+            const finalScore = userContest.current_game_score || 0;
+            setGameStartTime(null);
+            return finalScore;
+          }
+        } else {
+          newStartTime = new Date();
 
-        setGameStartTime(serverStartTime);
-        timerInitialized.current = true;
-
-        // Only update the database if there's no existing start time
-        if (!data.user_contests[0].current_game_start_time) {
-          const updateData = {
-            current_game_index: data.user_contests[0].current_game_index,
-            current_game_start_time: serverStartTime.toISOString(),
-            status: 'active'
-          };
-
+          
+          // Update the start time in the database
           await supabase
             .from('user_contests')
-            .update(updateData)
+            .update({
+              current_game_index: userContest.current_game_index,
+              current_game_start_time: newStartTime.toISOString(),
+              status: 'active'
+            })
             .eq('contest_id', contestId)
             .eq('user_id', user.id);
         }
+
+        setGameStartTime(newStartTime);
+        timerInitialized.current = true;
       }
 
     } catch (error) {
