@@ -7,19 +7,7 @@ import { SpotDifferenceGame } from "./games/SpotDifferenceGame";
 import { useEffect, useCallback } from "react";
 import { calculateScore } from "@/services/scoring/scoringRules";
 import { Loader2 } from "lucide-react";
-
-type GameCategory = 'arrange_sort' | 'trivia' | 'spot_difference';
-
-interface GameContent {
-  category: GameCategory;
-  content: unknown;
-  game_content_id: string;
-}
-
-interface Game {
-  game_content: GameContent;
-  id: string;
-}
+import { type Game } from "./hooks/types/gameTypes";
 
 interface GameContentProps {
   currentGame: Game;
@@ -73,19 +61,24 @@ export const GameContent = ({
       return <Loader2 className="h-8 w-8 animate-spin" />;
     }
 
-    const commonProps = {
-      content: game.game_content.content,
-      onComplete: (isCorrect: boolean, timeTaken: number, data?: Record<string, unknown>) => 
-        handleGameComplete(isCorrect, timeTaken, data)
-    };
+    const content = game.game_content.content as any;
 
     switch (game.game_content.category) {
       case 'arrange_sort':
-        return <ArrangeSortGame {...commonProps} />;
+        return <ArrangeSortGame 
+          content={content as { items: string[]; correctOrder: number[] }}
+          onComplete={handleGameComplete} 
+        />;
       case 'trivia':
-        return <TriviaGame {...commonProps} />;
+        return <TriviaGame 
+          content={content as { question: string; options: string[]; correctAnswer: number }}
+          onComplete={handleGameComplete}
+        />;
       case 'spot_difference':
-        return <SpotDifferenceGame {...commonProps} />;
+        return <SpotDifferenceGame 
+          content={content as { image1: string; image2: string; differences: { x: number; y: number; radius: number }[] }}
+          onComplete={handleGameComplete}
+        />;
       default:
         return <div className="text-center py-8">Unsupported game type</div>;
     }

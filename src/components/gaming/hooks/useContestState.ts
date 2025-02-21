@@ -13,7 +13,7 @@ export const useContestState = (
   initialProgress?: ContestProgress | null
 ) => {
   const navigate = useNavigate();
-  const { toast } = useToast();
+  const toast = useToast();
   
   const [currentGameIndex, setCurrentGameIndex] = useState(
     initialProgress?.current_game_index ?? 0
@@ -69,8 +69,6 @@ export const useContestState = (
       setGameStartTime,
       navigate,
       toast
-    }),
-    navigate,
-    toast
+    })
   };
 };
