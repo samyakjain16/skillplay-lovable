@@ -10,7 +10,6 @@ import { useToast } from "@/components/ui/use-toast";
 import { Trophy } from "lucide-react";
 import { Card } from "@/components/ui/card";
 
-// Define types for our leaderboard data
 interface LeaderboardEntry {
   user_id: string;
   total_score: number;
@@ -35,6 +34,11 @@ const ContestLeaderboard = () => {
 
       if (error) {
         console.error('Error fetching contest:', error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to load contest details"
+        });
         throw error;
       }
       return data;
@@ -49,10 +53,17 @@ const ContestLeaderboard = () => {
       try {
         // Get leaderboard data using the database function
         const { data: rankings, error: rankingsError } = await supabase
-          .rpc('get_contest_leaderboard', { contest_id: id });
+          .rpc('get_contest_leaderboard', {
+            contest_id: id
+          });
 
         if (rankingsError) {
           console.error('Error fetching rankings:', rankingsError);
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: "Failed to load rankings"
+          });
           throw rankingsError;
         }
 
@@ -68,6 +79,11 @@ const ContestLeaderboard = () => {
 
         if (profilesError) {
           console.error('Error fetching profiles:', profilesError);
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: "Failed to load player details"
+          });
           throw profilesError;
         }
 
@@ -97,6 +113,11 @@ const ContestLeaderboard = () => {
               title: "Error",
               description: "Failed to calculate prize distribution"
             });
+            // Continue without prize information
+            return rankings.map(rank => ({
+              ...rank,
+              username: usernameMap.get(rank.user_id) || 'Anonymous'
+            }));
           }
         }
 
@@ -116,7 +137,8 @@ const ContestLeaderboard = () => {
       }
     },
     enabled: !!contest && !!id,
-    refetchInterval: (contest?.status === 'in_progress') ? 5000 : false
+    refetchInterval: (contest?.status === 'in_progress') ? 5000 : false,
+    retry: 3
   });
 
   return (
