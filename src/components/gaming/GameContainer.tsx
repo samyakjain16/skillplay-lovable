@@ -1,5 +1,4 @@
 
-import { Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useGameProgress } from "./hooks/useGameProgress";
@@ -9,10 +8,9 @@ import { GameProgress } from "./GameProgress";
 import { GameContent } from "./GameContent";
 import { ContestCompletionHandler } from "./ContestCompletionHandler";
 import { GameInitializer } from "./GameInitializer";
-import { supabase } from "@/integrations/supabase/client";
-import type { Database } from "@/integrations/supabase/types";
-
-type PlayerGameProgress = Database["public"]["Tables"]["player_game_progress"]["Insert"];
+import { GameStateHandler } from "./GameStateHandler";
+import { LoadingState } from "./LoadingState";
+import { useToast } from "@/components/ui/use-toast";
 
 interface GameContainerProps {
   contestId: string;
@@ -31,6 +29,7 @@ export const GameContainer = ({
 }: GameContainerProps) => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { toast } = useToast();
   const { data: completedGamesCount, refetch: refetchCompletedGames } = useGameProgress(contestId);
   const { contest, contestGames, isLoading } = useContestAndGames(contestId);
   
@@ -42,116 +41,25 @@ export const GameContainer = ({
     hasRedirected,
     getGameEndTime,
     updateGameProgress,
-    toast,
     gameEndInProgress
   } = useContestState(contestId, user, initialProgress);
 
-  const handleGameEnd = async (score: number) => {
-    if (!user || !contestGames || gameEndInProgress.current) return;
-
-    gameEndInProgress.current = true;
-    const currentGame = contestGames[currentGameIndex];
-    const timeSpent = gameStartTime ? Math.floor((Date.now() - gameStartTime.getTime()) / 1000) : 30;
-    const isFinalGame = currentGameIndex === contestGames.length - 1;
-    const now = new Date().toISOString();
-
-    try {
-      // Get current server state
-      const { data: currentUserContest } = await supabase
-        .from('user_contests')
-        .select('score, current_game_index')
-        .eq('contest_id', contestId)
-        .eq('user_id', user.id)
-        .single();
-
-      if (!currentUserContest) {
-        throw new Error("User contest not found");
-      }
-
-      // Always use server's game index for validation
-      const serverGameIndex = currentUserContest.current_game_index;
-      
-      // If server index is different, sync with it
-      if (serverGameIndex !== currentGameIndex) {
-        console.log("Syncing with server game index:", serverGameIndex);
-        setCurrentGameIndex(serverGameIndex);
-        gameEndInProgress.current = false;
-        return;
-      }
-
-      const previousScore = currentUserContest.score || 0;
-      const newTotalScore = previousScore + score;
-      const nextGameIndex = isFinalGame ? currentGameIndex : currentGameIndex + 1;
-
-      // Update user_contests with accumulated score and progress
-      const { error: updateError } = await supabase
-        .from('user_contests')
-        .update({
-          current_game_index: nextGameIndex,
-          current_game_score: score,
-          current_game_start_time: null,
-          status: isFinalGame ? 'completed' : 'active',
-          completed_at: isFinalGame ? now : null,
-          score: newTotalScore
-        })
-        .eq('contest_id', contestId)
-        .eq('user_id', user.id);
-
-      if (updateError) {
-        console.error("Error updating contest progress:", updateError);
-        return;
-      }
-
-      // Record individual game progress
-      const progressData: PlayerGameProgress = {
-        user_id: user.id,
-        contest_id: contestId,
-        game_content_id: currentGame.game_content_id,
-        score: score,
-        time_taken: timeSpent,
-        started_at: gameStartTime?.toISOString(),
-        completed_at: now,
-        is_correct: score > 0
-      };
-
-      const { error: progressError } = await supabase
-        .from("player_game_progress")
-        .insert(progressData);
-
-      if (progressError) {
-        if (progressError.code === '23505') { // Unique violation
-          console.log("Game progress already recorded");
-        } else {
-          throw progressError;
-        }
-      }
-
-      await refetchCompletedGames();
-      onGameComplete(score, isFinalGame);
-
-      if (!isFinalGame) {
-        setCurrentGameIndex(nextGameIndex);
-        setGameStartTime(new Date());
-      }
-
-    } catch (error) {
-      console.error("Error in handleGameEnd:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "An error occurred while saving your progress.",
-      });
-    } finally {
-      gameEndInProgress.current = false;
-    }
-  };
+  const { handleGameEnd } = GameStateHandler({
+    user,
+    contestId,
+    currentGame: contestGames?.[currentGameIndex],
+    currentGameIndex,
+    gameStartTime,
+    gameEndInProgress,
+    setCurrentGameIndex,
+    setGameStartTime,
+    onGameComplete,
+    refetchCompletedGames,
+    toast
+  });
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
+    return <LoadingState />;
   }
 
   if (!contestGames || contestGames.length === 0) {
