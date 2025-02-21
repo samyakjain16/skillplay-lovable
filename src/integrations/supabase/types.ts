@@ -462,6 +462,7 @@ export type Database = {
           games_completed: number
           average_time: number
           rank: number
+          completion_rank: number
         }[]
       }
       join_contest: {
