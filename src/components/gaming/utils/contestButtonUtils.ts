@@ -53,8 +53,8 @@ export const getContestState = (
   );
   const isContestFull = contest.current_participants >= contest.max_participants;
 
-  // For contests that have ended
-  if (hasEnded || contest.status === "completed") {
+  // For contests that have ended and are marked as completed
+  if (contest.status === "completed") {
     return {
       text: "View Results",
       variant: "secondary",
@@ -71,6 +71,16 @@ export const getContestState = (
     if (!hasStarted) {
       return {
         text: "Starting Soon",
+        variant: "secondary",
+        disabled: true,
+        showProgress: false,
+        customClass: "bg-gray-400 text-white cursor-not-allowed",
+      };
+    }
+
+    if (hasEnded) {
+      return {
+        text: "Contest Ended",
         variant: "secondary",
         disabled: true,
         showProgress: false,
