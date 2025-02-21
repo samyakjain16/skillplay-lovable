@@ -1,4 +1,3 @@
-
 import { Card } from "@/components/ui/card";
 import { CountdownTimer } from "./CountdownTimer";
 import { ArrangeSortGame } from "./games/ArrangeSortGame";
@@ -43,12 +42,11 @@ export const GameContent = ({
     }
 
     try {
-      const score = await calculateScore({
-        category: currentGame.game_content.category,
-        isCorrect: true, // We know it's correct at this point
-        timeTaken,
-        additionalData
-      });
+      const score = await calculateScore(
+        currentGame.game_content.category,
+        isCorrect,
+        timeTaken
+      );
       onGameEnd(score);
     } catch (error) {
       console.error('Error calculating game score:', error);
