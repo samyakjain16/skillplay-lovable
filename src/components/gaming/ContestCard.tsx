@@ -5,6 +5,9 @@ import { ContestStatusButton } from "./ContestStatusButton";
 import { useToast } from "@/components/ui/use-toast";
 import { useNavigate } from "react-router-dom";
 import { type Contest } from "./ContestTypes";
+import { useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface ContestCardProps {
   contest: Contest;
@@ -27,10 +30,74 @@ export const ContestCard = ({
 }: ContestCardProps) => {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   
   const isWaitingForPlayers = 
     contest.contest_type === 'fixed_participants' && 
     (contest.current_participants || 0) < (contest.max_participants || 0);
+
+  useEffect(() => {
+    // Subscribe to real-time updates for this specific contest
+    const channel = supabase
+      .channel(`contest-${contest.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'contests',
+          filter: `id=eq.${contest.id}`
+        },
+        (payload) => {
+          // Update contest data in both queries
+          const newData = payload.new as Contest;
+          
+          // Update in my-contests
+          queryClient.setQueryData(['my-contests'], (oldData: any) => {
+            if (!oldData) return oldData;
+            return oldData.map((item: any) => {
+              if (item.contest.id === contest.id) {
+                return {
+                  ...item,
+                  contest: {
+                    ...item.contest,
+                    current_participants: newData.current_participants,
+                    status: newData.status
+                  }
+                };
+              }
+              return item;
+            });
+          });
+
+          // Update in available-contests
+          queryClient.setQueryData(['available-contests'], (oldData: any) => {
+            if (!oldData) return oldData;
+            return oldData.map((item: Contest) => {
+              if (item.id === contest.id) {
+                return {
+                  ...item,
+                  current_participants: newData.current_participants,
+                  status: newData.status
+                };
+              }
+              return item;
+            });
+          });
+
+          // Force refetch if needed
+          if (newData.status !== contest.status) {
+            queryClient.invalidateQueries({ queryKey: ['my-contests'] });
+            queryClient.invalidateQueries({ queryKey: ['available-contests'] });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [contest.id, queryClient]);
 
   const handleContestAction = async (event: React.MouseEvent) => {
     event.preventDefault();
@@ -79,7 +146,7 @@ export const ContestCard = ({
         contest.status === 'completed'
           ? 'cursor-pointer opacity-75'
           : isWaitingForPlayers && isInMyContests
-          ? 'cursor-default opacity-75 pointer-events-none'
+          ? 'cursor-default opacity-75'
           : (isStarting || isJoining) 
             ? 'cursor-wait' 
             : 'cursor-pointer'
