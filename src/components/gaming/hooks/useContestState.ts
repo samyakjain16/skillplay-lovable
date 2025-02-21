@@ -118,8 +118,13 @@ export const useContestState = (
       if (error) throw error;
 
       if (data) {
-        setGameTimeSlot(data);
-        return data;
+        // Ensure we're setting a single GameTimeSlot object
+        const timeSlot: GameTimeSlot = {
+          start_time: data.start_time,
+          end_time: data.end_time
+        };
+        setGameTimeSlot(timeSlot);
+        return timeSlot;
       }
     } catch (error) {
       console.error('Error getting game time slot:', error);
@@ -144,4 +149,3 @@ export const useContestState = (
     gameEndInProgress
   };
 };
-

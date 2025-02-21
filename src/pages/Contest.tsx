@@ -1,14 +1,14 @@
-
 import { useEffect, useState } from "react";
 import { Navigation } from "@/components/Navigation";
 import { useNavigate, useParams } from "react-router-dom";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ContestPageHeader } from "@/components/contest/ContestPageHeader";
 import { ContestGameSection } from "@/components/contest/ContestGameSection";
 import { ContestSidebar } from "@/components/contest/ContestSidebar";
+import { Button } from "@/components/ui/button";
 
 const Contest = () => {
   const { id } = useParams();
@@ -19,7 +19,6 @@ const Contest = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  // Fetch contest details
   const { data: contest, isLoading: isLoadingContest } = useQuery({
     queryKey: ["contest", id],
     queryFn: async () => {
@@ -36,7 +35,6 @@ const Contest = () => {
     enabled: !!id
   });
 
-  // Fetch contest progress
   const { data: contestProgress, isLoading: isLoadingProgress } = useQuery({
     queryKey: ["contest-progress", id],
     queryFn: async () => {
