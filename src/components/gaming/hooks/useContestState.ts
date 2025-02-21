@@ -1,4 +1,3 @@
-
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/components/ui/use-toast";
@@ -38,7 +37,6 @@ export const useContestState = (
     try {
       updateInProgress.current = true;
 
-      // Get contest information and user's progress
       const { data, error } = await supabase
         .from('contests')
         .select(`
@@ -76,10 +74,8 @@ export const useContestState = (
         return;
       }
 
-      // Get completed games
       const completedGames = new Set(userContest.completed_games || []);
 
-      // If current game is completed, move to next game
       if (completedGames.has(contestId + '_' + currentGameIndex)) {
         const nextGameIndex = currentGameIndex + 1;
         if (nextGameIndex < data.series_count) {
@@ -97,7 +93,6 @@ export const useContestState = (
         return;
       }
 
-      // Get or create time slot for current game
       await getOrCreateGameTimeSlot(currentGameIndex);
 
     } catch (error) {
@@ -109,7 +104,7 @@ export const useContestState = (
 
   const getOrCreateGameTimeSlot = async (gameIndex: number) => {
     try {
-      const { data, error } = await supabase
+      const { data: timeSlotData, error } = await supabase
         .rpc('get_or_create_game_time_slot', {
           p_contest_id: contestId,
           p_game_index: gameIndex
@@ -117,11 +112,10 @@ export const useContestState = (
 
       if (error) throw error;
 
-      if (data) {
-        // Ensure we're setting a single GameTimeSlot object
+      if (timeSlotData) {
         const timeSlot: GameTimeSlot = {
-          start_time: data.start_time,
-          end_time: data.end_time
+          start_time: timeSlotData.start_time,
+          end_time: timeSlotData.end_time
         };
         setGameTimeSlot(timeSlot);
         return timeSlot;
