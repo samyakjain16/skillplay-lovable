@@ -1,136 +1,138 @@
-
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
 
+// Constants
+const GAME_DURATION_MS = 30000; // 30 seconds
+
+interface ContestProgress {
+  current_game_index: number;
+  current_game_start_time: string | null;
+  current_game_score: number;
+  status: 'active' | 'completed';
+}
+
+interface ContestData {
+  series_count: number;
+  start_time: string;
+  end_time: string;
+  status: 'active' | 'completed';
+}
+
 export const useContestState = (
   contestId: string,
   user: User | null,
-  initialProgress?: {
-    current_game_index: number;
-    current_game_start_time: string | null;
-    current_game_score: number;
-  } | null
+  initialProgress?: ContestProgress | null
 ) => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [currentGameIndex, setCurrentGameIndex] = useState(initialProgress?.current_game_index || 0);
+  
+  // State
+  const [currentGameIndex, setCurrentGameIndex] = useState(
+    initialProgress?.current_game_index ?? 0
+  );
   const [gameStartTime, setGameStartTime] = useState<Date | null>(
     initialProgress?.current_game_start_time ? new Date(initialProgress.current_game_start_time) : null
   );
-  const hasRedirected = useRef(false);
-  const updateInProgress = useRef(false);
-  const gameEndInProgress = useRef(false);
-  const timerInitialized = useRef(false);
 
-  // Function to calculate remaining time for a game
-  const getGameEndTime = (): Date | null => {
-    if (!gameStartTime) return null;
-    const endTime = new Date(gameStartTime.getTime() + 30000); // 30 seconds from start
-    const now = new Date();
-    
-    if (now > endTime) {
-      return null;
-    }
-    return endTime;
-  };
+  // Refs for operation locks and status
+  const operationLocks = useRef({
+    update: false,
+    gameEnd: false,
+    timerInitialized: false,
+    hasRedirected: false
+  });
 
-  // Function to handle automatic game progression when timer ends
-  const autoProgressGame = async () => {
-    if (gameEndInProgress.current) return;
-    gameEndInProgress.current = true;
-
+  // Get appropriate game index based on elapsed time
+  const getAppropriateGameIndex = async (): Promise<number | null> => {
     try {
       const { data: contest } = await supabase
         .from('contests')
-        .select('series_count')
+        .select('start_time, series_count, status')
         .eq('id', contestId)
         .single();
 
-      if (!contest) return;
+      if (!contest || contest.status === 'completed') return null;
 
-      const nextGameIndex = currentGameIndex + 1;
-      
-      // If this was the last game
-      if (nextGameIndex >= contest.series_count) {
-        const now = new Date().toISOString();
-        await supabase
-          .from('user_contests')
-          .update({
-            status: 'completed',
-            completed_at: now,
-            current_game_start_time: null,
-            current_game_index: currentGameIndex
-          })
-          .eq('contest_id', contestId)
-          .eq('user_id', user?.id);
-
-        navigate('/gaming');
-        return;
-      }
-
-      // Progress to next game
+      const startTime = new Date(contest.start_time);
       const now = new Date();
-      await supabase
-        .from('user_contests')
-        .update({
-          current_game_index: nextGameIndex,
-          current_game_start_time: now.toISOString(),
-          current_game_score: 0
-        })
-        .eq('contest_id', contestId)
-        .eq('user_id', user?.id);
+      const elapsedMs = now.getTime() - startTime.getTime();
+      const appropriateIndex = Math.floor(elapsedMs / GAME_DURATION_MS);
 
-      setCurrentGameIndex(nextGameIndex);
-      setGameStartTime(now);
-      timerInitialized.current = true;
+      return Math.min(appropriateIndex, contest.series_count - 1);
     } catch (error) {
-      console.error('Error in auto progress:', error);
-    } finally {
-      gameEndInProgress.current = false;
+      console.error('Error calculating appropriate game index:', error);
+      return null;
     }
   };
 
-  // Effect to handle timer expiration
-  useEffect(() => {
-    if (!gameStartTime || !user) return;
+  // Calculate remaining time for current game
+  const getGameEndTime = (): Date | null => {
+    if (!gameStartTime) return null;
+    const endTime = new Date(gameStartTime.getTime() + GAME_DURATION_MS);
+    return new Date() > endTime ? null : endTime;
+  };
 
-    const endTime = getGameEndTime();
-    if (!endTime) return;
-
-    const timeoutId = setTimeout(() => {
-      autoProgressGame();
-    }, endTime.getTime() - new Date().getTime());
-
-    return () => clearTimeout(timeoutId);
-  }, [gameStartTime, user, contestId, currentGameIndex]);
-
+  // Update game progress on server and handle state changes
   const updateGameProgress = async () => {
-    if (!user || !contestId || updateInProgress.current || gameEndInProgress.current) {
+    if (!user || !contestId || operationLocks.current.update || operationLocks.current.gameEnd) {
       return;
     }
 
     try {
-      updateInProgress.current = true;
+      operationLocks.current.update = true;
 
-      // Get current server-side state
-      const { data: userContest, error: userContestError } = await supabase
-        .from('user_contests')
-        .select('current_game_index, current_game_start_time, status')
-        .eq('contest_id', contestId)
-        .eq('user_id', user.id)
-        .maybeSingle();
+      // Get current server states
+      const [{ data: userContest }, { data: contest }] = await Promise.all([
+        supabase
+          .from('user_contests')
+          .select('current_game_index, current_game_start_time, status')
+          .eq('contest_id', contestId)
+          .eq('user_id', user.id)
+          .single(),
+        supabase
+          .from('contests')
+          .select('series_count, status, start_time, end_time')
+          .eq('id', contestId)
+          .single()
+      ]);
 
-      if (userContestError || !userContest) {
-        console.error('Error fetching user contest:', userContestError);
+      if (!contest || !userContest) {
+        throw new Error('Contest or user progress not found');
+      }
+
+      // Handle completed states
+      if (contest.status === 'completed' || userContest.status === 'completed') {
+        if (!operationLocks.current.hasRedirected) {
+          operationLocks.current.hasRedirected = true;
+          navigate('/gaming');
+        }
         return;
       }
 
-      // If contest is completed, redirect to appropriate screen
-      if (userContest.status === 'completed') {
-        navigate('/gaming');
+      // For new or returning players, calculate appropriate game
+      if (!userContest.current_game_start_time) {
+        const appropriateIndex = await getAppropriateGameIndex();
+        if (appropriateIndex === null) return;
+
+        const now = new Date();
+        await supabase
+          .from('user_contests')
+          .upsert({
+            contest_id: contestId,
+            user_id: user.id,
+            current_game_index: appropriateIndex,
+            current_game_start_time: now.toISOString(),
+            status: 'active'
+          })
+          .eq('contest_id', contestId)
+          .eq('user_id', user.id);
+
+        setCurrentGameIndex(appropriateIndex);
+        setGameStartTime(now);
+        operationLocks.current.timerInitialized = true;
         return;
       }
 
@@ -140,54 +142,87 @@ export const useContestState = (
       }
 
       // Handle game timing
-      if (userContest.current_game_start_time) {
-        const serverStartTime = new Date(userContest.current_game_start_time);
-        const now = new Date();
-        const timeDiff = now.getTime() - serverStartTime.getTime();
+      const serverStartTime = new Date(userContest.current_game_start_time);
+      const timeDiff = Date.now() - serverStartTime.getTime();
 
-        // If time has expired, trigger auto-progress
-        if (timeDiff >= 30000) {
-          autoProgressGame();
+      // If current game has expired
+      if (timeDiff >= GAME_DURATION_MS) {
+        const nextIndex = userContest.current_game_index + 1;
+        
+        // Check if this was the last game
+        if (nextIndex >= contest.series_count) {
+          await supabase
+            .from('user_contests')
+            .update({
+              status: 'completed',
+              completed_at: new Date().toISOString(),
+              current_game_start_time: null
+            })
+            .eq('contest_id', contestId)
+            .eq('user_id', user.id);
+
+          if (!operationLocks.current.hasRedirected) {
+            operationLocks.current.hasRedirected = true;
+            navigate('/gaming');
+          }
           return;
         }
 
-        // Use server time
-        setGameStartTime(serverStartTime);
-        timerInitialized.current = true;
-      } else if (!timerInitialized.current) {
-        // Start new game timer
+        // Progress to next game
         const now = new Date();
         await supabase
           .from('user_contests')
           .update({
+            current_game_index: nextIndex,
             current_game_start_time: now.toISOString(),
-            status: 'active',
-            current_game_index: userContest.current_game_index
+            current_game_score: 0
           })
           .eq('contest_id', contestId)
           .eq('user_id', user.id);
 
+        setCurrentGameIndex(nextIndex);
         setGameStartTime(now);
-        timerInitialized.current = true;
+        operationLocks.current.timerInitialized = true;
+      } else {
+        // Use server time for consistency
+        setGameStartTime(serverStartTime);
+        operationLocks.current.timerInitialized = true;
       }
 
     } catch (error) {
       console.error('Error in updateGameProgress:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to update game progress. Please refresh the page.",
+      });
     } finally {
-      updateInProgress.current = false;
+      operationLocks.current.update = false;
     }
   };
+
+  // Effect to handle automatic progress check
+  useEffect(() => {
+    if (!user || !contestId) return;
+
+    // Initial progress check
+    updateGameProgress();
+
+    // Set up regular progress checks
+    const intervalId = setInterval(updateGameProgress, 5000); // Check every 5 seconds
+
+    return () => clearInterval(intervalId);
+  }, [user, contestId]);
 
   return {
     currentGameIndex,
     setCurrentGameIndex,
     gameStartTime,
     setGameStartTime,
-    hasRedirected,
+    operationLocks,
     getGameEndTime,
     updateGameProgress,
     navigate,
-    toast,
-    gameEndInProgress
+    toast
   };
 };

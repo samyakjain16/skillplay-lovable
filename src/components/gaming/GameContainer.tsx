@@ -1,4 +1,4 @@
-
+import { Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useGameProgress } from "./hooks/useGameProgress";
@@ -6,20 +6,21 @@ import { useContestAndGames } from "./hooks/useContestAndGames";
 import { useContestState } from "./hooks/useContestState";
 import { GameProgress } from "./GameProgress";
 import { GameContent } from "./GameContent";
-import { ContestCompletionHandler } from "./ContestCompletionHandler";
-import { GameInitializer } from "./GameInitializer";
 import { GameStateHandler } from "./GameStateHandler";
-import { LoadingState } from "./LoadingState";
 import { useToast } from "@/components/ui/use-toast";
+
+// Define proper types
+interface ContestProgress {
+  current_game_index: number;
+  current_game_start_time: string | null;
+  current_game_score: number;
+  status: 'active' | 'completed';  // Add status field
+}
 
 interface GameContainerProps {
   contestId: string;
   onGameComplete: (score: number, isFinalGame: boolean) => void;
-  initialProgress?: {
-    current_game_index: number;
-    current_game_start_time: string | null;
-    current_game_score: number;
-  } | null;
+  initialProgress?: ContestProgress | null;
 }
 
 export const GameContainer = ({ 
@@ -30,27 +31,60 @@ export const GameContainer = ({
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
+  
   const { data: completedGamesCount, refetch: refetchCompletedGames } = useGameProgress(contestId);
-  const { contest, contestGames, isLoading } = useContestAndGames(contestId);
+  const { contest, contestGames, isLoading, error } = useContestAndGames(contestId);
   
   const {
     currentGameIndex,
     setCurrentGameIndex,
     gameStartTime,
     setGameStartTime,
-    hasRedirected,
+    operationLocks,
     getGameEndTime,
-    updateGameProgress,
-    gameEndInProgress
+    updateGameProgress
   } = useContestState(contestId, user, initialProgress);
 
-  const { handleGameEnd } = GameStateHandler({
+  // Handle loading and error states
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  if (error || !contestGames || contestGames.length === 0) {
+    return (
+      <div className="text-center py-8">
+        <p>{error?.message || "No games available for this contest"}</p>
+      </div>
+    );
+  }
+
+  // Handle completed games
+  if (completedGamesCount && contest && completedGamesCount >= contest.series_count) {
+    const now = new Date();
+    const contestEnd = new Date(contest.end_time);
+    const isContestFinished = now > contestEnd;
+
+    return (
+      <GameProgress 
+        contestId={contestId} 
+        isContestFinished={isContestFinished}
+        onRetry={updateGameProgress}
+      />
+    );
+  }
+
+  // Create game state handler instance (without 'new' keyword)
+  const gameStateHandler = GameStateHandler({
     user,
     contestId,
-    currentGame: contestGames?.[currentGameIndex],
+    currentGame: contestGames[currentGameIndex],
     currentGameIndex,
     gameStartTime,
-    gameEndInProgress,
+    gameEndInProgress: operationLocks,
     setCurrentGameIndex,
     setGameStartTime,
     onGameComplete,
@@ -58,52 +92,15 @@ export const GameContainer = ({
     toast
   });
 
-  if (isLoading) {
-    return <LoadingState />;
-  }
-
-  if (!contestGames || contestGames.length === 0) {
-    return (
-      <div className="text-center py-8">
-        <p>No games available for this contest</p>
-      </div>
-    );
-  }
-
-  if (completedGamesCount && contest && completedGamesCount >= contest.series_count) {
-    const now = new Date();
-    const contestEnd = new Date(contest.end_time);
-    const isContestFinished = now > contestEnd;
-
-    return <GameProgress contestId={contestId} isContestFinished={isContestFinished} />;
-  }
-
   return (
-    <>
-      <ContestCompletionHandler
-        contest={contest}
-        completedGamesCount={completedGamesCount}
-        hasRedirected={hasRedirected}
-      />
-      
-      <GameInitializer
-        contest={contest}
-        contestGames={contestGames}
-        user={user}
-        completedGamesCount={completedGamesCount}
-        hasRedirected={hasRedirected}
-        updateGameProgress={updateGameProgress}
-        navigate={navigate}
-        toast={toast}
-      />
-
+    <div className="space-y-4">
       <GameContent 
         currentGame={contestGames[currentGameIndex]}
         currentGameIndex={currentGameIndex}
         totalGames={contestGames.length}
         gameEndTime={getGameEndTime()}
-        onGameEnd={handleGameEnd}
+        onGameEnd={gameStateHandler.handleGameEnd}
       />
-    </>
+    </div>
   );
 };
