@@ -1,3 +1,4 @@
+
 import { Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -110,7 +111,7 @@ export const GameContainer = ({
     setGameStartTime,
     onGameComplete,
     refetchCompletedGames,
-    toast  // Pass toast directly
+    toast
   });
 
   return (

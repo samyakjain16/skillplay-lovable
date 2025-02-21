@@ -15,9 +15,11 @@ interface GameStateHandlerProps {
   setGameStartTime: (time: Date | null) => void;
   onGameComplete: (score: number, isFinalGame: boolean) => void;
   refetchCompletedGames: (options?: RefetchOptions) => Promise<QueryObserverResult<number, Error>>;
-  toast: {
-    toast: (props: { title: string; description: string; variant?: "default" | "destructive" }) => void;
-  };
+  toast: (props: { 
+    title: string; 
+    description: string; 
+    variant?: "default" | "destructive" 
+  }) => void;
 }
 
 export const GameStateHandler = ({
@@ -125,7 +127,7 @@ export const GameStateHandler = ({
 
     } catch (error) {
       console.error("Error in handleGameEnd:", error);
-      toast.toast({
+      toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to save game progress",
         variant: "destructive"
