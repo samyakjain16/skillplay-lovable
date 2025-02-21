@@ -2,6 +2,7 @@
 import { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
+import { QueryObserverResult, RefetchOptions } from "@tanstack/react-query";
 
 type PlayerGameProgress = Database["public"]["Tables"]["player_game_progress"]["Insert"];
 
@@ -15,7 +16,7 @@ interface GameStateHandlerProps {
   setCurrentGameIndex: (index: number) => void;
   setGameStartTime: (time: Date) => void;
   onGameComplete: (score: number, isFinalGame: boolean) => void;
-  refetchCompletedGames: () => Promise<void>;
+  refetchCompletedGames: (options?: RefetchOptions) => Promise<QueryObserverResult<number, Error>>;
   toast: any;
 }
 
