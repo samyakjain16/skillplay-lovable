@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -10,9 +11,6 @@ import { ContestCompletionHandler } from "./ContestCompletionHandler";
 import { GameInitializer } from "./GameInitializer";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
-import { useEffect } from "react";
-
-type PlayerGameProgress = Database["public"]["Tables"]["player_game_progress"]["Insert"];
 
 interface GameContainerProps {
   contestId: string;
@@ -38,36 +36,13 @@ export const GameContainer = ({
     currentGameIndex,
     setCurrentGameIndex,
     gameStartTime,
+    setGameStartTime,
     getGameEndTime,
     updateGameProgress,
     toast,
     gameEndInProgress,
     hasRedirected
   } = useContestState(contestId, user, initialProgress);
-
-  // Add synchronization interval
-  useEffect(() => {
-    const syncInterval = setInterval(() => {
-      if (!gameEndInProgress.current) {
-        updateGameProgress();
-      }
-    }, 5000); // Sync every 5 seconds
-
-    return () => clearInterval(syncInterval);
-  }, [updateGameProgress]);
-
-  // Auto-end game when time expires
-  useEffect(() => {
-    const checkGameEnd = () => {
-      const endTime = getGameEndTime();
-      if (endTime === null && gameStartTime && !gameEndInProgress.current) {
-        handleGameEnd(0); // End game with score 0 if time expired
-      }
-    };
-
-    const timer = setInterval(checkGameEnd, 1000);
-    return () => clearInterval(timer);
-  }, [gameStartTime, getGameEndTime]);
 
   const handleGameEnd = async (score: number) => {
     if (!user || !contestGames || gameEndInProgress.current) return;
@@ -79,44 +54,31 @@ export const GameContainer = ({
     const now = new Date().toISOString();
 
     try {
-      // Get latest game state from server
-      const { data: currentUserContest } = await supabase
+      // Get current user contest state
+      const { data: userContest } = await supabase
         .from('user_contests')
-        .select('score, current_game_index, current_game_start_time')
+        .select('current_game_index, score, completed_games')
         .eq('contest_id', contestId)
         .eq('user_id', user.id)
         .single();
 
-      // Validate game completion timing
-      if (currentUserContest?.current_game_start_time) {
-        const startTime = new Date(currentUserContest.current_game_start_time);
-        const elapsedTime = Date.now() - startTime.getTime();
-        if (elapsedTime > 30000) { // 30 seconds in milliseconds
-          score = 0; // Reset score if submitted after time limit
-        }
-      }
+      if (!userContest) throw new Error('User contest not found');
 
-      // Handle case where game was already completed
-      if (currentUserContest && currentUserContest.current_game_index > currentGameIndex) {
-        console.log("Game already completed, moving to next game");
-        if (!isFinalGame) {
-          setCurrentGameIndex(currentUserContest.current_game_index);
-          updateGameProgress();
-        }
-        gameEndInProgress.current = false;
-        return;
-      }
-
-      const previousScore = currentUserContest?.score || 0;
+      // Calculate new scores
+      const previousScore = userContest.score || 0;
       const newTotalScore = previousScore + score;
 
-      // Update user_contests with accumulated score and progress
+      // Update user_contests with new game completion
+      const completedGames = userContest.completed_games || [];
+      const updatedCompletedGames = [...completedGames, currentGame.game_content_id];
+
       const { error: updateError } = await supabase
         .from('user_contests')
         .update({
           current_game_index: isFinalGame ? currentGameIndex : currentGameIndex + 1,
           current_game_score: score,
           current_game_start_time: null,
+          completed_games: updatedCompletedGames,
           status: isFinalGame ? 'completed' : 'active',
           completed_at: isFinalGame ? now : null,
           score: newTotalScore
@@ -124,37 +86,28 @@ export const GameContainer = ({
         .eq('contest_id', contestId)
         .eq('user_id', user.id);
 
-      if (updateError) {
-        throw updateError;
-      }
+      if (updateError) throw updateError;
 
-      // Record individual game progress
-      const progressData: PlayerGameProgress = {
-        user_id: user.id,
-        contest_id: contestId,
-        game_content_id: currentGame.game_content_id,
-        score: score,
-        time_taken: timeSpent,
-        started_at: gameStartTime?.toISOString(),
-        completed_at: now,
-        is_correct: score > 0
-      };
-
-      const { error: progressError } = await supabase
+      // Record game progress for analytics
+      await supabase
         .from("player_game_progress")
-        .upsert(progressData, {
-          onConflict: 'user_id,contest_id,game_content_id'
+        .insert({
+          user_id: user.id,
+          contest_id: contestId,
+          game_content_id: currentGame.game_content_id,
+          score: score,
+          time_taken: timeSpent,
+          started_at: gameStartTime?.toISOString(),
+          completed_at: now,
+          is_correct: score > 0
         });
-
-      if (progressError) {
-        throw progressError;
-      }
 
       await refetchCompletedGames();
       onGameComplete(score, isFinalGame);
       
       if (!isFinalGame) {
         setCurrentGameIndex(prev => prev + 1);
+        setGameStartTime(new Date());
       }
 
     } catch (error) {
@@ -168,6 +121,30 @@ export const GameContainer = ({
       gameEndInProgress.current = false;
     }
   };
+
+  // Auto-end game when time expires
+  useEffect(() => {
+    if (!gameStartTime) return;
+
+    const timeoutId = setTimeout(() => {
+      if (!gameEndInProgress.current) {
+        handleGameEnd(0);
+      }
+    }, getGameEndTime()?.getTime() - Date.now());
+
+    return () => clearTimeout(timeoutId);
+  }, [gameStartTime]);
+
+  // Regular progress updates
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!gameEndInProgress.current) {
+        updateGameProgress();
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [updateGameProgress]);
 
   if (isLoading) {
     return (
