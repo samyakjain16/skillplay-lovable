@@ -44,8 +44,8 @@ export const useContestRealtime = () => {
     const now = Date.now();
     const lastUpdate = lastUpdateRef.current[contestId] || 0;
     
-    // Only process updates that are at least 500ms apart
-    if (now - lastUpdate < 500) {
+    // Only process updates that are at least 200ms apart
+    if (now - lastUpdate < 200) {
       return false;
     }
     
@@ -54,6 +54,53 @@ export const useContestRealtime = () => {
   };
 
   useEffect(() => {
+    // Function to update contest data in both queries
+    const updateContestInQueries = async (contestData: Contest) => {
+      if (!contestData?.id) return;
+
+      const now = new Date();
+      const endTime = contestData.end_time ? new Date(contestData.end_time) : null;
+      const hasEnded = endTime ? now > endTime : false;
+      
+      const finalContest = {
+        ...contestData,
+        status: hasEnded ? 'completed' : contestData.status
+      };
+
+      console.log('Updating contest data:', finalContest);
+
+      // Update my-contests query
+      queryClient.setQueriesData({ queryKey: ['my-contests'] }, (oldData: any) => {
+        if (!oldData) return oldData;
+        return oldData.map((participation: MyContestParticipation) => {
+          if (participation.contest.id === finalContest.id) {
+            return {
+              ...participation,
+              contest: { ...participation.contest, ...finalContest }
+            };
+          }
+          return participation;
+        });
+      });
+
+      // Update available-contests query
+      queryClient.setQueriesData({ queryKey: ['available-contests'] }, (oldData: any) => {
+        if (!oldData) return oldData;
+        return oldData.map((contest: AvailableContest) => {
+          if (contest.id === finalContest.id) {
+            return { ...contest, ...finalContest };
+          }
+          return contest;
+        });
+      });
+
+      // Force immediate refetch to ensure data consistency
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['my-contests'] }),
+        queryClient.invalidateQueries({ queryKey: ['available-contests'] })
+      ]);
+    };
+
     const channel = supabase
       .channel('contest-changes')
       .on(
@@ -64,56 +111,12 @@ export const useContestRealtime = () => {
           table: 'contests'
         },
         async (payload: RealtimePostgresChangesPayload<Contest>) => {
-          const newContest = payload.new as Contest;
+          console.log('Received contest update:', payload);
+          const contestData = payload.new as Contest;
           
-          if (!newContest?.id || !shouldProcessUpdate(newContest.id)) return;
-
-          console.log('Processing contest update:', payload);
-
-          const now = new Date();
-          const endTime = newContest.end_time ? new Date(newContest.end_time) : null;
-          const hasEnded = endTime ? now > endTime : false;
-
-          const finalContest = {
-            ...newContest,
-            status: hasEnded ? 'completed' : newContest.status
-          };
-
-          // Update queries synchronously to ensure immediate UI updates
-          queryClient.setQueriesData({ queryKey: ['my-contests'] }, (oldData: any) => {
-            if (!oldData) return oldData;
-            return oldData.map((participation: MyContestParticipation) => {
-              if (participation.contest.id === finalContest.id) {
-                return {
-                  ...participation,
-                  contest: { ...participation.contest, ...finalContest }
-                };
-              }
-              return participation;
-            });
-          });
-
-          queryClient.setQueriesData({ queryKey: ['available-contests'] }, (oldData: any) => {
-            if (!oldData) return oldData;
-            return oldData.map((contest: AvailableContest) => {
-              if (contest.id === finalContest.id) {
-                return { ...contest, ...finalContest };
-              }
-              return contest;
-            });
-          });
-
-          // Force immediate refetch to ensure data consistency
-          await Promise.all([
-            queryClient.invalidateQueries({ queryKey: ['my-contests'] }),
-            queryClient.invalidateQueries({ queryKey: ['available-contests'] })
-          ]);
-
-          // Force immediate refetch
-          await Promise.all([
-            queryClient.refetchQueries({ queryKey: ['my-contests'] }),
-            queryClient.refetchQueries({ queryKey: ['available-contests'] })
-          ]);
+          if (!contestData?.id || !shouldProcessUpdate(contestData.id)) return;
+          
+          await updateContestInQueries(contestData);
         }
       )
       .on(
@@ -126,13 +129,18 @@ export const useContestRealtime = () => {
         async (payload: RealtimePostgresChangesPayload<UserContest>) => {
           console.log('Received user contest update:', payload);
           
-          // Force immediate refetch of my-contests
-          await queryClient.invalidateQueries({ queryKey: ['my-contests'] });
-          await queryClient.refetchQueries({ queryKey: ['my-contests'] });
+          if (payload.new?.contest_id && shouldProcessUpdate(payload.new.contest_id)) {
+            // Fetch the latest contest data when a user_contests change occurs
+            const { data: contestData } = await supabase
+              .from('contests')
+              .select('*')
+              .eq('id', payload.new.contest_id)
+              .single();
 
-          // Also refetch available contests to update states
-          await queryClient.invalidateQueries({ queryKey: ['available-contests'] });
-          await queryClient.refetchQueries({ queryKey: ['available-contests'] });
+            if (contestData) {
+              await updateContestInQueries(contestData);
+            }
+          }
         }
       )
       .subscribe();
