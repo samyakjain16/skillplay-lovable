@@ -113,10 +113,11 @@ export const useContestState = (
 
       if (error) throw error;
 
-      if (timeSlotData) {
+      // The function returns an array with a single object
+      if (timeSlotData && timeSlotData[0]) {
         const timeSlot: GameTimeSlot = {
-          start_time: timeSlotData.start_time,
-          end_time: timeSlotData.end_time
+          start_time: timeSlotData[0].start_time,
+          end_time: timeSlotData[0].end_time
         };
         setGameTimeSlot(timeSlot);
         return timeSlot;
