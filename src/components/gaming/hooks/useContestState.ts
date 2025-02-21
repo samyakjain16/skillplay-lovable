@@ -43,6 +43,7 @@ export const useContestState = (
 
     try {
       updateInProgress.current = true;
+      console.log("Updating game progress for contest:", contestId);
 
       // Get current server-side state
       const { data: userContest, error: userContestError } = await supabase
@@ -60,7 +61,7 @@ export const useContestState = (
       // Check if the contest is still active
       const { data: contest, error: contestError } = await supabase
         .from('contests')
-        .select('status, series_count')
+        .select('status, series_count, start_time, end_time')
         .eq('id', contestId)
         .single();
 
@@ -80,21 +81,31 @@ export const useContestState = (
         return;
       }
 
-      // If the server game index is ahead, use that instead
-      if (userContest.current_game_index > currentGameIndex) {
-        console.log('Syncing with server game index:', userContest.current_game_index);
-        setCurrentGameIndex(userContest.current_game_index);
+      // Calculate appropriate game index based on contest timing
+      const now = new Date();
+      const startTime = new Date(contest.start_time);
+      const elapsed = now.getTime() - startTime.getTime();
+      const timeBasedGameIndex = Math.floor(elapsed / 30000); // 30 seconds per game
+
+      // Use the maximum of server's game index and time-based index
+      const appropriateGameIndex = Math.max(
+        userContest.current_game_index,
+        timeBasedGameIndex
+      );
+
+      // If we need to update the game index
+      if (appropriateGameIndex !== currentGameIndex) {
+        console.log('Syncing with appropriate game index:', appropriateGameIndex);
+        setCurrentGameIndex(appropriateGameIndex);
       }
 
       // Check if we've exceeded the series count
-      if (userContest.current_game_index >= contest.series_count) {
+      if (appropriateGameIndex >= contest.series_count) {
         console.log('All games completed');
         navigate('/gaming');
         return;
       }
 
-      const now = new Date();
-      
       // Handle game timing
       if (userContest.current_game_start_time) {
         const serverStartTime = new Date(userContest.current_game_start_time);
@@ -114,7 +125,7 @@ export const useContestState = (
         const updateData = {
           current_game_start_time: now.toISOString(),
           status: 'active',
-          current_game_index: userContest.current_game_index // Ensure we keep the server's game index
+          current_game_index: appropriateGameIndex
         };
 
         const { error: updateError } = await supabase

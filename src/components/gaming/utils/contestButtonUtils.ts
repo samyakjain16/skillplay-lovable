@@ -44,7 +44,8 @@ export const getContestState = (
     prize_calculation_status?: string;
   },
   isInMyContests?: boolean,
-  userCompletedGames?: boolean
+  userCompletedGames?: boolean,
+  currentGameNumber?: number
 ): ButtonState => {
   const { hasStarted, hasEnded } = getTimeStatus(
     contest.start_time,
@@ -98,8 +99,13 @@ export const getContestState = (
       };
     }
 
+    // Show current game number
+    const gameText = currentGameNumber !== undefined 
+      ? `Continue Game ${currentGameNumber + 1}/${contest.series_count}`
+      : "Continue Playing";
+
     return {
-      text: "Continue Playing",
+      text: gameText,
       variant: "default",
       disabled: false,
       showProgress: true,
