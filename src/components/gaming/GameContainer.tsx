@@ -10,7 +10,6 @@ import { GameContent } from "./GameContent";
 import { ContestCompletionHandler } from "./ContestCompletionHandler";
 import { GameInitializer } from "./GameInitializer";
 import { supabase } from "@/integrations/supabase/client";
-import type { Database } from "@/integrations/supabase/types";
 
 interface GameContainerProps {
   contestId: string;
@@ -29,7 +28,7 @@ export const GameContainer = ({
 }: GameContainerProps) => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { data: completedGamesCount, refetch: refetchCompletedGames } = useGameProgress(contestId);
+  const { data: gameProgressData, refetch: refetchCompletedGames } = useGameProgress(contestId);
   const { contest, contestGames, isLoading } = useContestAndGames(contestId);
   
   const {
@@ -162,7 +161,7 @@ export const GameContainer = ({
     );
   }
 
-  if (completedGamesCount && contest && completedGamesCount >= contest.series_count) {
+  if (gameProgressData && contest && gameProgressData.count >= contest.series_count) {
     const now = new Date();
     const contestEnd = new Date(contest.end_time);
     const isContestFinished = now > contestEnd;
@@ -174,7 +173,7 @@ export const GameContainer = ({
     <>
       <ContestCompletionHandler
         contest={contest}
-        completedGamesCount={completedGamesCount}
+        completedGamesCount={gameProgressData?.count}
         hasRedirected={hasRedirected}
       />
       
@@ -182,7 +181,7 @@ export const GameContainer = ({
         contest={contest}
         contestGames={contestGames}
         user={user}
-        completedGamesCount={completedGamesCount}
+        completedGamesCount={gameProgressData?.count}
         hasRedirected={hasRedirected}
         updateGameProgress={updateGameProgress}
         navigate={navigate}

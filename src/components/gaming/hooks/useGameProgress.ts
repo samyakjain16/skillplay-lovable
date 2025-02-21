@@ -1,3 +1,4 @@
+
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -69,10 +70,10 @@ export const useGameProgress = (contestId: string) => {
     },
     enabled: !!user,
     staleTime: 1000, // Consider data stale after 1 second
-    cacheTime: 30000, // Keep in cache for 30 seconds
-    refetchInterval: (data) => {
+    gcTime: 30000, // Keep in cache for 30 seconds (replacing cacheTime)
+    refetchInterval: (query) => {
       // Refetch more frequently if there's an active game
-      return data?.currentGameStart ? 1000 : 5000;
+      return query.state.data?.currentGameStart ? 1000 : 5000;
     }
   });
 };
@@ -105,6 +106,6 @@ export const useDetailedGameProgress = (contestId: string) => {
     },
     enabled: !!user,
     staleTime: 30000, // Consider data stale after 30 seconds
-    cacheTime: 5 * 60 * 1000 // Keep in cache for 5 minutes
+    gcTime: 5 * 60 * 1000 // Keep in cache for 5 minutes (replacing cacheTime)
   });
 };
