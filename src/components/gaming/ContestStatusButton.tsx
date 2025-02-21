@@ -24,21 +24,26 @@ export const ContestStatusButton = ({
   const buttonState = getContestState(contest, isInMyContests, userCompletedGames, currentGameIndex);
 
   return (
-    <div className="space-y-2">
-      <Button
-        variant={buttonState.variant}
-        disabled={buttonState.disabled || loading}
-        className={`w-full ${buttonState.customClass}`}
-      >
-        {loading ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          buttonState.text
-        )}
-      </Button>
-      {buttonState.showProgress && (
-        <Progress value={progress} className="h-2" />
+    <Button
+      variant={buttonState.variant}
+      disabled={buttonState.disabled || loading}
+      className={`w-full relative ${buttonState.customClass}`}
+    >
+      {loading ? (
+        <Loader2 className="h-4 w-4 animate-spin" />
+      ) : (
+        <>
+          <span className="relative z-10">{buttonState.text}</span>
+          {buttonState.showProgress && (
+            <div className="absolute inset-0 overflow-hidden rounded-md">
+              <Progress 
+                value={progress} 
+                className="absolute inset-0 rounded-none bg-black/10" 
+              />
+            </div>
+          )}
+        </>
       )}
-    </div>
+    </Button>
   );
 };
