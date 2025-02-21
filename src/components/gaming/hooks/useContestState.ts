@@ -1,3 +1,4 @@
+
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/components/ui/use-toast";
@@ -28,8 +29,8 @@ export const useContestState = (
   const getGameEndTime = (): Date | null => {
     if (!gameStartTime) return null;
     
-    const now = new Date();
     const endTime = new Date(gameStartTime.getTime() + (GAME_DURATION * 1000));
+    const now = new Date();
     
     return now > endTime ? null : endTime;
   };
@@ -42,7 +43,7 @@ export const useContestState = (
     try {
       updateInProgress.current = true;
 
-      // Get contest start time and user's progress
+      // Get contest information and user's progress
       const { data, error } = await supabase
         .from('contests')
         .select(`
@@ -80,7 +81,7 @@ export const useContestState = (
         return;
       }
 
-      // Calculate appropriate game based on elapsed time
+      // Calculate time-based game index
       const contestStartTime = new Date(data.start_time);
       const now = new Date();
       const elapsedSeconds = Math.floor((now.getTime() - contestStartTime.getTime()) / 1000);
@@ -89,39 +90,50 @@ export const useContestState = (
       // Get completed games
       const completedGames = new Set(userContest.completed_games || []);
 
-      // Find next available game
-      let nextGameIndex = Math.max(timeBasedGameIndex, userContest.current_game_index);
+      // Determine the appropriate game index
+      const baseGameIndex = Math.max(timeBasedGameIndex, userContest.current_game_index);
+      
+      // If current game is completed, move to next game
+      if (completedGames.has(contestId + '_' + currentGameIndex)) {
+        const nextGameIndex = currentGameIndex + 1;
+        setCurrentGameIndex(nextGameIndex);
+        const newStartTime = new Date();
+        setGameStartTime(newStartTime);
+
+        await supabase
+          .from('user_contests')
+          .update({
+            current_game_index: nextGameIndex,
+            current_game_start_time: newStartTime.toISOString()
+          })
+          .eq('contest_id', contestId)
+          .eq('user_id', user.id);
+          
+        return;
+      }
 
       // Update game state if needed
-      if (nextGameIndex !== currentGameIndex || !gameStartTime) {
-        // Calculate proper start time for this game
+      if (baseGameIndex !== currentGameIndex || !gameStartTime) {
+        // Calculate proper start time for current game
         const gameStartTimeFromContest = userContest.current_game_start_time
           ? new Date(userContest.current_game_start_time)
-          : new Date();
+          : contestStartTime;
 
-        const now = new Date();
-        const gameElapsed = now.getTime() - gameStartTimeFromContest.getTime();
+        const gameOffset = baseGameIndex * GAME_DURATION * 1000;
+        const expectedStartTime = new Date(contestStartTime.getTime() + gameOffset);
+        
+        setGameStartTime(expectedStartTime);
+        setCurrentGameIndex(baseGameIndex);
 
-        // If current game hasn't expired
-        if (gameElapsed < GAME_DURATION * 1000) {
-          setGameStartTime(gameStartTimeFromContest);
-        } else {
-          // Start new game
-          const newStartTime = new Date();
-          setGameStartTime(newStartTime);
-
-          // Update in database
-          await supabase
-            .from('user_contests')
-            .update({
-              current_game_index: nextGameIndex,
-              current_game_start_time: newStartTime.toISOString()
-            })
-            .eq('contest_id', contestId)
-            .eq('user_id', user.id);
-        }
-
-        setCurrentGameIndex(nextGameIndex);
+        // Update in database
+        await supabase
+          .from('user_contests')
+          .update({
+            current_game_index: baseGameIndex,
+            current_game_start_time: expectedStartTime.toISOString()
+          })
+          .eq('contest_id', contestId)
+          .eq('user_id', user.id);
       }
 
     } catch (error) {
