@@ -443,12 +443,6 @@ export type Database = {
         }
         Returns: string
       }
-      distribute_contest_prizes: {
-        Args: {
-          contest_id: string
-        }
-        Returns: boolean
-      }
       get_contest_leaderboard: {
         Args: {
           contest_id: string

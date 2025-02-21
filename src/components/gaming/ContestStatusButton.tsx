@@ -1,85 +1,147 @@
+
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { Loader2 } from "lucide-react";
-import { getContestState, getTimeStatus } from "./utils/contestButtonUtils";
+import { useEffect, useState, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { getTimeStatus } from "./utils/contestButtonUtils";
+import { ContestProgressBar } from "./ContestProgressBar";
 import { type Contest } from "./ContestTypes";
-import { useEffect, useState } from "react";
 
 interface ContestStatusButtonProps {
-  contest: Contest;
+  contest: Pick<Contest, "id" | "status" | "start_time" | "end_time" | "current_participants" | "max_participants" | "series_count" | "contest_type">;
+  onClick?: () => void;
   loading?: boolean;
   isInMyContests?: boolean;
   userCompletedGames?: boolean;
-  currentGameIndex?: number;
-  onClick?: () => void;
-  className?: string;
 }
 
-export const ContestStatusButton = ({
-  contest,
-  loading = false,
-  isInMyContests = false,
-  userCompletedGames = false,
-  currentGameIndex,
-  onClick,
-  className = "",
+export const ContestStatusButton = ({ 
+  contest, 
+  onClick, 
+  loading,
+  isInMyContests,
+  userCompletedGames 
 }: ContestStatusButtonProps) => {
-  // State for progress updates
-  const [timeStatus, setTimeStatus] = useState(() => 
-    getTimeStatus(contest.start_time, contest.end_time)
-  );
+  const [localLoading, setLocalLoading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const queryClient = useQueryClient();
 
-  // Update progress periodically
+  const handleClick = async () => {
+    if (loading || buttonState.disabled) return;
+    
+    setLocalLoading(true);
+    try {
+      await onClick?.();
+    } finally {
+      setLocalLoading(false);
+    }
+  };
+
   useEffect(() => {
-    if (!isInMyContests || userCompletedGames) return;
+    const updateProgress = () => {
+      const { progress, hasEnded } = getTimeStatus(contest.start_time, contest.end_time);
+      setProgress(progress);
 
-    const intervalId = setInterval(() => {
-      setTimeStatus(getTimeStatus(contest.start_time, contest.end_time));
-    }, 1000);
+      if (hasEnded) {
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+          intervalRef.current = null;
+        }
+        queryClient.invalidateQueries({ queryKey: ["contest", contest.id] });
+      }
+    };
 
-    return () => clearInterval(intervalId);
-  }, [contest.start_time, contest.end_time, isInMyContests, userCompletedGames]);
+    if (contest.status === "in_progress") {
+      updateProgress();
+      if (!intervalRef.current) {
+        intervalRef.current = setInterval(updateProgress, 1000);
+      }
+    } else {
+      setProgress(0);
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    }
 
-  const buttonState = getContestState(
-    contest, 
-    isInMyContests, 
-    userCompletedGames, 
-    currentGameIndex
-  );
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, [contest.status, contest.id, contest.start_time, contest.end_time, queryClient]);
 
-  const combinedClassName = `w-full relative ${buttonState.customClass} ${className}`.trim();
+  let buttonText = "Join Contest";
+  if (!isInMyContests && contest.contest_type === 'fixed_participants') {
+    buttonText = `Join (${contest.current_participants}/${contest.max_participants})`;
+  }
+
+  const buttonState = {
+    text: buttonText,
+    variant: "default" as const,
+    disabled: false,
+    showProgress: contest.status === "in_progress",
+    customClass: "bg-green-500 hover:bg-green-600 text-white"
+  };
+
+  // Modify button state based on contest conditions
+  if (isInMyContests) {
+    const isWaitingForPlayers = 
+      contest.contest_type === 'fixed_participants' && 
+      contest.current_participants < contest.max_participants;
+
+    if (isWaitingForPlayers) {
+      buttonState.text = `Waiting for Players (${contest.current_participants}/${contest.max_participants})`;
+      buttonState.disabled = true;
+      buttonState.customClass = "bg-gray-400 text-white cursor-not-allowed";
+    } else if (contest.status === "completed") {
+      buttonState.text = "View Leaderboard";
+      buttonState.variant = "default";
+      buttonState.customClass = "bg-gray-600 hover:bg-gray-700 text-white";
+    } else if (userCompletedGames) {
+      buttonState.text = "Games Completed";
+      buttonState.disabled = true;
+      buttonState.customClass = "bg-blue-600 text-white";
+    } else if (contest.status === "in_progress") {
+      buttonState.text = "Continue Playing";
+      buttonState.customClass = "bg-blue-500 hover:bg-blue-600 text-white";
+    } else {
+      buttonState.text = "Start Playing";
+      buttonState.customClass = "bg-blue-500 hover:bg-blue-600 text-white";
+    }
+  } else {
+    if (contest.current_participants >= contest.max_participants) {
+      buttonState.text = "Contest Full";
+      buttonState.variant = "default";
+      buttonState.disabled = true;
+      buttonState.customClass = "bg-gray-600 text-white";
+    }
+  }
 
   return (
-    <Button
-      variant={buttonState.variant}
-      disabled={buttonState.disabled || loading}
-      className={combinedClassName}
-      onClick={onClick}
-      aria-label={buttonState.text}
-    >
-      {loading ? (
-        <Loader2 className="h-4 w-4 animate-spin" />
-      ) : (
-        <>
-          {buttonState.showProgress && (
-            <>
-              {/* Contest overall progress */}
-              <Progress 
-                value={timeStatus.progress} 
-                className="absolute inset-0 opacity-20" 
-                aria-label="Contest progress"
-              />
-              {/* Current game progress */}
-              <Progress 
-                value={timeStatus.gameProgress} 
-                className="absolute inset-0" 
-                aria-label="Current game progress"
-              />
-            </>
-          )}
-          <span className="relative z-10">{buttonState.text}</span>
-        </>
-      )}
-    </Button>
+    <div className="relative w-full">
+      <Button 
+        className={`w-full relative overflow-hidden transition-all duration-500 ${buttonState.customClass}`}
+        variant={buttonState.variant}
+        disabled={localLoading || buttonState.disabled}
+        onClick={handleClick}
+      >
+        {localLoading ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            {isInMyContests ? "Starting..." : "Joining..."}
+          </>
+        ) : buttonState.showProgress ? (
+          <>
+            <span className="relative z-10">{buttonState.text}</span>
+            <ContestProgressBar progress={progress} />
+          </>
+        ) : (
+          buttonState.text
+        )}
+      </Button>
+    </div>
   );
 };

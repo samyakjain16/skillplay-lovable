@@ -1,8 +1,1 @@
-
 project_id = "dglufhvlbomdqadtthvd"
-
-[functions.distribute_contest_prizes]
-verify_jwt = false
-
-[functions.check_completed_contests]
-verify_jwt = false

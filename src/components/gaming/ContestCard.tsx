@@ -54,27 +54,14 @@ export const ContestCard = ({
     }
 
     if (contest.status === 'completed') {
-      // Check prize calculation status
-      if (contest.prize_calculation_status === 'completed') {
-        navigate(`/contest/${contest.id}/leaderboard`);
-      } else if (contest.prize_calculation_status === 'in_progress') {
-        toast({
-          title: "Calculating Results",
-          description: "Please wait while we calculate the final results.",
-        });
-      } else {
-        toast({
-          title: "Processing Results",
-          description: "Results will be available soon.",
-        });
-      }
+      navigate(`/contest/${contest.id}/leaderboard`);
       return;
     }
 
     if (userCompletedGames) {
       toast({
         title: "Games Completed",
-        description: "Results will be available when the contest ends.",
+        description: "You've completed all games. Leaderboard will be available when the contest ends.",
       });
       return;
     }
@@ -86,17 +73,11 @@ export const ContestCard = ({
 
   const totalPrizePool = (contest.entry_fee || 0) * (contest.current_participants || 0);
   
-  const isDisabled = 
-    contest.status === 'completed' && 
-    contest.prize_calculation_status !== 'completed';
-  
   return (
     <Card 
       className={`w-full transition-all duration-200 hover:shadow-lg ${
-        isDisabled
-          ? 'cursor-not-allowed opacity-75'
-          : contest.status === 'completed' && contest.prize_calculation_status === 'completed'
-          ? 'cursor-pointer opacity-100'
+        contest.status === 'completed'
+          ? 'cursor-pointer opacity-75'
           : isWaitingForPlayers && isInMyContests
           ? 'cursor-default opacity-75 pointer-events-none'
           : (isStarting || isJoining) 
@@ -109,14 +90,14 @@ export const ContestCard = ({
         <div className="space-y-4">
           <div>
             <h3 className="text-lg font-semibold">{contest.title}</h3>
+            {contest.status === 'completed' && (
+              <span className="text-sm text-muted-foreground">
+                Contest completed - View leaderboard
+              </span>
+            )}
             {isWaitingForPlayers && (
               <span className="text-sm text-muted-foreground">
                 Waiting for more players to join ({contest.current_participants}/{contest.max_participants})
-              </span>
-            )}
-            {contest.status === 'completed' && contest.prize_calculation_status === 'in_progress' && (
-              <span className="text-sm text-muted-foreground">
-                Calculating final results...
               </span>
             )}
           </div>

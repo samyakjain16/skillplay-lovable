@@ -1,74 +1,120 @@
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/components/ui/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
-import { ContestProgress, OperationLocks } from "./types/contestState";
-import { GAME_DURATION_MS } from "./utils/gameIndexUtils";
-import { updateGameProgress } from "./utils/gameProgressUtils";
 
 export const useContestState = (
   contestId: string,
   user: User | null,
-  initialProgress?: ContestProgress | null
+  initialProgress?: {
+    current_game_index: number;
+    current_game_start_time: string | null;
+    current_game_score: number;
+  } | null
 ) => {
   const navigate = useNavigate();
-  const toast = useToast();
-  
-  const [currentGameIndex, setCurrentGameIndex] = useState(
-    initialProgress?.current_game_index ?? 0
-  );
+  const { toast } = useToast();
+  const [currentGameIndex, setCurrentGameIndex] = useState(initialProgress?.current_game_index || 0);
   const [gameStartTime, setGameStartTime] = useState<Date | null>(
     initialProgress?.current_game_start_time ? new Date(initialProgress.current_game_start_time) : null
   );
-
-  const operationLocks = useRef<OperationLocks>({
-    update: false,
-    gameEnd: false,
-    timerInitialized: false,
-    hasRedirected: false
-  });
+  const hasRedirected = useRef(false);
+  const updateInProgress = useRef(false);
+  const gameEndInProgress = useRef(false);
+  const timerInitialized = useRef(false);
 
   const getGameEndTime = (): Date | null => {
-    if (!gameStartTime) return null;
-    const endTime = new Date(gameStartTime.getTime() + GAME_DURATION_MS);
-    return new Date() > endTime ? null : endTime;
+    if (!gameStartTime || timerInitialized.current === false) return null;
+    return new Date(gameStartTime.getTime() + 30000); // 30 seconds from start
   };
 
-  useEffect(() => {
-    if (!user || !contestId) return;
+  const updateGameProgress = async () => {
+    if (!user || !contestId || updateInProgress.current || gameEndInProgress.current) {
+      return;
+    }
 
-    const progressUpdate = () => updateGameProgress({
-      user,
-      contestId,
-      operationLocks,
-      setCurrentGameIndex,
-      setGameStartTime,
-      navigate,
-      toast
-    });
+    try {
+      updateInProgress.current = true;
+      const now = new Date();
 
-    progressUpdate();
-    const intervalId = setInterval(progressUpdate, 5000);
+      // Use a single query to get both contest and user_contest status
+      const { data, error } = await supabase
+        .from('contests')
+        .select(`
+          status,
+          user_contests!inner (
+            status,
+            current_game_index,
+            current_game_start_time
+          )
+        `)
+        .eq('id', contestId)
+        .eq('user_contests.user_id', user.id)
+        .single();
 
-    return () => clearInterval(intervalId);
-  }, [user, contestId]);
+      if (error) {
+        console.error('Error checking status:', error.message);
+        return;
+      }
+
+      if (!data) {
+        navigate('/gaming');
+        return;
+      }
+
+      if (data.status === 'completed') {
+        navigate(`/contest/${contestId}/leaderboard`);
+        return;
+      }
+
+      if (data.user_contests[0].status === 'completed') {
+        navigate('/gaming');
+        return;
+      }
+
+      // Only update game start time if it hasn't been set or if it's a new game
+      if (!timerInitialized.current || 
+          !data.user_contests[0].current_game_start_time || 
+          currentGameIndex !== data.user_contests[0].current_game_index) {
+        
+        setCurrentGameIndex(data.user_contests[0].current_game_index);
+        setGameStartTime(now);
+        timerInitialized.current = true;
+
+        const updateData = {
+          current_game_index: data.user_contests[0].current_game_index,
+          current_game_start_time: now.toISOString(),
+          status: 'active'
+        };
+
+        await supabase
+          .from('user_contests')
+          .update(updateData)
+          .eq('contest_id', contestId)
+          .eq('user_id', user.id);
+      }
+
+    } catch (error) {
+      if (error instanceof Error) {
+        console.error('Error in updateGameProgress:', error.message);
+      }
+    } finally {
+      updateInProgress.current = false;
+    }
+  };
 
   return {
     currentGameIndex,
     setCurrentGameIndex,
     gameStartTime,
     setGameStartTime,
-    operationLocks,
+    hasRedirected,
     getGameEndTime,
-    updateGameProgress: () => updateGameProgress({
-      user,
-      contestId,
-      operationLocks,
-      setCurrentGameIndex,
-      setGameStartTime,
-      navigate,
-      toast
-    })
+    updateGameProgress,
+    navigate,
+    toast,
+    gameEndInProgress
   };
 };

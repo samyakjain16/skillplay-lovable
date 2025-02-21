@@ -7,32 +7,21 @@ import { useContestAndGames } from "./hooks/useContestAndGames";
 import { useContestState } from "./hooks/useContestState";
 import { GameProgress } from "./GameProgress";
 import { GameContent } from "./GameContent";
-import { GameStateHandler } from "./GameStateHandler";
-import { useToast } from "@/hooks/use-toast";
-import { GameInitializer } from "./GameInitializer";
 import { ContestCompletionHandler } from "./ContestCompletionHandler";
-import { useRef } from "react";
-import { type Game } from "./hooks/types/gameTypes";
+import { GameInitializer } from "./GameInitializer";
+import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 
-interface ContestProgress {
-  current_game_index: number;
-  current_game_start_time: string | null;
-  current_game_score: number;
-  status: 'active' | 'completed';
-}
+type PlayerGameProgress = Database["public"]["Tables"]["player_game_progress"]["Insert"];
 
 interface GameContainerProps {
   contestId: string;
   onGameComplete: (score: number, isFinalGame: boolean) => void;
-  initialProgress?: ContestProgress | null;
-}
-
-interface Contest {
-  id: string;
-  status: 'active' | 'completed';
-  series_count: number;
-  end_time: string;
-  start_time: string;
+  initialProgress?: {
+    current_game_index: number;
+    current_game_start_time: string | null;
+    current_game_score: number;
+  } | null;
 }
 
 export const GameContainer = ({ 
@@ -42,10 +31,6 @@ export const GameContainer = ({
 }: GameContainerProps) => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { toast } = useToast();
-  const hasRedirected = useRef(false);
-  const gameEndInProgress = useRef(false);
-  
   const { data: completedGamesCount, refetch: refetchCompletedGames } = useGameProgress(contestId);
   const { contest, contestGames, isLoading } = useContestAndGames(contestId);
   
@@ -53,13 +38,113 @@ export const GameContainer = ({
     currentGameIndex,
     setCurrentGameIndex,
     gameStartTime,
-    setGameStartTime,
-    operationLocks,
+    hasRedirected,
     getGameEndTime,
-    updateGameProgress
+    updateGameProgress,
+    toast,
+    gameEndInProgress
   } = useContestState(contestId, user, initialProgress);
 
-  // Handle loading state
+  const handleGameEnd = async (score: number) => {
+    if (!user || !contestGames || gameEndInProgress.current) return;
+
+    gameEndInProgress.current = true;
+    const currentGame = contestGames[currentGameIndex];
+    const timeSpent = gameStartTime ? Math.floor((Date.now() - gameStartTime.getTime()) / 1000) : 30;
+    const isFinalGame = currentGameIndex === contestGames.length - 1;
+    const now = new Date().toISOString();
+
+    try {
+      // Calculate new total score by adding current game score
+      const { data: currentUserContest } = await supabase
+        .from('user_contests')
+        .select('score, current_game_index')
+        .eq('contest_id', contestId)
+        .eq('user_id', user.id)
+        .single();
+
+      // If the current game index in the database is ahead of our local state,
+      // it means this game was already completed (possibly by the timer)
+      if (currentUserContest && currentUserContest.current_game_index > currentGameIndex) {
+        console.log("Game already completed, moving to next game");
+        if (!isFinalGame) {
+          setCurrentGameIndex(currentUserContest.current_game_index);
+          updateGameProgress();
+        }
+        gameEndInProgress.current = false;
+        return;
+      }
+
+      const previousScore = currentUserContest?.score || 0;
+      const newTotalScore = previousScore + score;
+
+      // Update user_contests with accumulated score and progress
+      const { error: updateError } = await supabase
+        .from('user_contests')
+        .update({
+          current_game_index: isFinalGame ? currentGameIndex : currentGameIndex + 1,
+          current_game_score: score,
+          current_game_start_time: null,
+          status: isFinalGame ? 'completed' : 'active',
+          completed_at: isFinalGame ? now : null,
+          score: newTotalScore
+        })
+        .eq('contest_id', contestId)
+        .eq('user_id', user.id);
+
+      if (updateError) {
+        console.error("Error updating contest progress:", updateError);
+        return;
+      }
+
+      // Record individual game progress
+      const progressData: PlayerGameProgress = {
+        user_id: user.id,
+        contest_id: contestId,
+        game_content_id: currentGame.game_content_id,
+        score: score,
+        time_taken: timeSpent,
+        started_at: gameStartTime?.toISOString(),
+        completed_at: now,
+        is_correct: score > 0
+      };
+
+      const { error: progressError } = await supabase
+        .from("player_game_progress")
+        .insert(progressData);
+
+      if (progressError) {
+        if (progressError.code === '23505') { // Unique violation
+          console.log("Game already completed, moving to next game");
+          if (!isFinalGame) {
+            setCurrentGameIndex(prev => prev + 1);
+            updateGameProgress();
+          }
+          gameEndInProgress.current = false;
+          return;
+        }
+        throw progressError;
+      }
+
+      await refetchCompletedGames();
+      onGameComplete(score, isFinalGame);
+      
+      if (!isFinalGame) {
+        setCurrentGameIndex(prev => prev + 1);
+      }
+
+    } catch (error) {
+      console.error("Error in handleGameEnd:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "An error occurred while saving your progress.",
+      });
+    } finally {
+      gameEndInProgress.current = false;
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -76,48 +161,24 @@ export const GameContainer = ({
     );
   }
 
-  // Handle completed games
   if (completedGamesCount && contest && completedGamesCount >= contest.series_count) {
     const now = new Date();
     const contestEnd = new Date(contest.end_time);
     const isContestFinished = now > contestEnd;
 
-    return (
-      <GameProgress 
-        contestId={contestId} 
-        isContestFinished={isContestFinished}
-        onRetry={updateGameProgress}
-      />
-    );
+    return <GameProgress contestId={contestId} isContestFinished={isContestFinished} />;
   }
-
-  const currentGame: Game = {
-    id: contestGames[currentGameIndex].id,
-    game_content: {
-      game_content_id: contestGames[currentGameIndex].game_content_id,
-      category: contestGames[currentGameIndex].game_content.category,
-      content: contestGames[currentGameIndex].game_content.content
-    }
-  };
-
-  const gameStateHandler = GameStateHandler({
-    user,
-    contestId,
-    currentGame,
-    currentGameIndex,
-    gameStartTime,
-    gameEndInProgress,
-    setCurrentGameIndex,
-    setGameStartTime,
-    onGameComplete,
-    refetchCompletedGames,
-    toast
-  });
 
   return (
     <>
+      <ContestCompletionHandler
+        contest={contest}
+        completedGamesCount={completedGamesCount}
+        hasRedirected={hasRedirected}
+      />
+      
       <GameInitializer
-        contest={contest as Contest}
+        contest={contest}
         contestGames={contestGames}
         user={user}
         completedGamesCount={completedGamesCount}
@@ -126,22 +187,14 @@ export const GameContainer = ({
         navigate={navigate}
         toast={toast}
       />
-      
-      <ContestCompletionHandler
-        contest={contest as Contest}
-        completedGamesCount={completedGamesCount}
-        hasRedirected={hasRedirected}
-      />
 
-      <div className="space-y-4">
-        <GameContent 
-          currentGame={currentGame}
-          currentGameIndex={currentGameIndex}
-          totalGames={contestGames.length}
-          gameEndTime={getGameEndTime()}
-          onGameEnd={gameStateHandler.handleGameEnd}
-        />
-      </div>
+      <GameContent 
+        currentGame={contestGames[currentGameIndex]}
+        currentGameIndex={currentGameIndex}
+        totalGames={contestGames.length}
+        gameEndTime={getGameEndTime()}
+        onGameEnd={handleGameEnd}
+      />
     </>
   );
 };

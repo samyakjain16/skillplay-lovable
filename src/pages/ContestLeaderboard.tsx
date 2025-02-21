@@ -24,7 +24,6 @@ const ContestLeaderboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Query contest details
   const { data: contest } = useQuery({
     queryKey: ["contest", id],
     queryFn: async () => {
@@ -34,38 +33,49 @@ const ContestLeaderboard = () => {
         .eq("id", id)
         .maybeSingle();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching contest:', error);
+        throw error;
+      }
       return data;
     }
   });
 
-  // Query leaderboard data including prizes if contest is completed
   const { data: leaderboard, isLoading } = useQuery<LeaderboardEntry[]>({
-    queryKey: ["contest-leaderboard", id, contest?.status],
+    queryKey: ["contest-leaderboard", id],
     queryFn: async () => {
       if (!contest || !id) return [];
 
       try {
-        // Get leaderboard data
+        // Get leaderboard data using the database function
         const { data: rankings, error: rankingsError } = await supabase
           .rpc('get_contest_leaderboard', { contest_id: id });
 
-        if (rankingsError) throw rankingsError;
-        if (!rankings || rankings.length === 0) return [];
+        if (rankingsError) {
+          console.error('Error fetching rankings:', rankingsError);
+          throw rankingsError;
+        }
 
-        // Get usernames
+        if (!rankings || rankings.length === 0) {
+          return [];
+        }
+
+        // Get usernames for all participants
         const { data: profiles, error: profilesError } = await supabase
           .from('profiles')
           .select('id, username')
           .in('id', rankings.map(r => r.user_id));
 
-        if (profilesError) throw profilesError;
+        if (profilesError) {
+          console.error('Error fetching profiles:', profilesError);
+          throw profilesError;
+        }
 
         const usernameMap = new Map(
           profiles?.map(p => [p.id, p.username]) || []
         );
 
-        // If contest is completed and has prize pool, get prize distribution
+        // Calculate prize distribution if contest is completed
         if (contest.status === 'completed' && contest.prize_pool > 0) {
           try {
             const prizes = await calculatePrizeDistribution(
@@ -74,6 +84,7 @@ const ContestLeaderboard = () => {
               contest.prize_distribution_type
             );
 
+            // Combine all data
             return rankings.map(rank => ({
               ...rank,
               username: usernameMap.get(rank.user_id) || 'Anonymous',
@@ -105,7 +116,6 @@ const ContestLeaderboard = () => {
       }
     },
     enabled: !!contest && !!id,
-    // Only refetch every 5 seconds if contest is in progress
     refetchInterval: (contest?.status === 'in_progress') ? 5000 : false
   });
 

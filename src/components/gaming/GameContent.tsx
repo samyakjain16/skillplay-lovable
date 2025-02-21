@@ -1,15 +1,15 @@
+
 import { Card } from "@/components/ui/card";
 import { CountdownTimer } from "./CountdownTimer";
 import { ArrangeSortGame } from "./games/ArrangeSortGame";
 import { TriviaGame } from "./games/TriviaGame";
 import { SpotDifferenceGame } from "./games/SpotDifferenceGame";
-import { useCallback } from "react";
-import { calculateScore } from "@/services/scoring/scoringRules";
+import { useEffect } from "react";
+import { calculateGameScore } from "@/services/scoring/scoringRules";
 import { Loader2 } from "lucide-react";
-import { type Game } from "./hooks/types/gameTypes";
 
 interface GameContentProps {
-  currentGame: Game;
+  currentGame: any;
   currentGameIndex: number;
   totalGames: number;
   gameEndTime: Date | null;
@@ -23,11 +23,22 @@ export const GameContent = ({
   gameEndTime,
   onGameEnd
 }: GameContentProps) => {
-  
-  const handleGameComplete = useCallback(async (
+  // Effect to handle game end when time runs out
+  useEffect(() => {
+    if (!gameEndTime) return;
+
+    const timeoutId = setTimeout(() => {
+      // When time runs out, submit with score 0
+      onGameEnd(0);
+    }, gameEndTime.getTime() - new Date().getTime());
+
+    return () => clearTimeout(timeoutId);
+  }, [gameEndTime, onGameEnd]);
+
+  const handleGameComplete = async (
     isCorrect: boolean,
     timeTaken: number,
-    additionalData?: Record<string, unknown>
+    additionalData?: Record<string, any>
   ) => {
     if (!currentGame?.game_content?.category) {
       console.error('Game content or category is missing');
@@ -35,50 +46,65 @@ export const GameContent = ({
       return;
     }
 
-    // Handle incorrect answers immediately
+    // If answer is incorrect, immediately return 0 score
     if (!isCorrect) {
       onGameEnd(0);
       return;
     }
 
     try {
-      const score = await calculateScore(
+      const score = await calculateGameScore(
         currentGame.game_content.category,
         isCorrect,
-        timeTaken
+        timeTaken,
+        additionalData
       );
       onGameEnd(score);
     } catch (error) {
       console.error('Error calculating game score:', error);
       onGameEnd(0);
     }
-  }, [currentGame?.game_content?.category, onGameEnd]);
+  };
 
-  const renderGameContent = (game: Game) => {
+  const renderGameContent = (game: any) => {
+    // Check if game content exists
     if (!game?.game_content) {
-      return <Loader2 className="h-8 w-8 animate-spin" />;
+      return (
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      );
     }
-
-    const content = game.game_content.content as any;
 
     switch (game.game_content.category) {
       case 'arrange_sort':
-        return <ArrangeSortGame 
-          content={content as { items: string[]; correctOrder: number[] }}
-          onComplete={handleGameComplete} 
-        />;
+        return (
+          <ArrangeSortGame
+            content={game.game_content.content}
+            onComplete={(isCorrect, timeTaken) => handleGameComplete(isCorrect, timeTaken)}
+          />
+        );
       case 'trivia':
-        return <TriviaGame 
-          content={content as { question: string; options: string[]; correctAnswer: number }}
-          onComplete={handleGameComplete}
-        />;
+        return (
+          <TriviaGame
+            content={game.game_content.content}
+            onComplete={(isCorrect, timeTaken) => handleGameComplete(isCorrect, timeTaken)}
+          />
+        );
       case 'spot_difference':
-        return <SpotDifferenceGame 
-          content={content as { image1: string; image2: string; differences: { x: number; y: number; radius: number }[] }}
-          onComplete={handleGameComplete}
-        />;
+        return (
+          <SpotDifferenceGame
+            content={game.game_content.content}
+            onComplete={(isCorrect, timeTaken, data) => 
+              handleGameComplete(isCorrect, timeTaken, data)}
+          />
+        );
       default:
-        return <div className="text-center py-8">Unsupported game type</div>;
+        return (
+          <div className="text-center py-8">
+            <p>Unsupported game type</p>
+          </div>
+        );
     }
   };
 
@@ -100,17 +126,12 @@ export const GameContent = ({
         </h3>
         {gameEndTime && (
           <div className="text-sm font-medium">
-            Time Remaining: 
-            <CountdownTimer 
-              targetDate={gameEndTime} 
-              onEnd={() => onGameEnd(0)}
-              className="ml-2" 
-            />
+            Time Remaining: <CountdownTimer targetDate={gameEndTime} onEnd={() => onGameEnd(0)} />
           </div>
         )}
       </div>
 
-      <div className="min-h-[300px] relative">
+      <div className="min-h-[300px]">
         {renderGameContent(currentGame)}
       </div>
     </Card>

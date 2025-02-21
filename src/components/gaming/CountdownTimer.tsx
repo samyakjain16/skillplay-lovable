@@ -1,46 +1,41 @@
-import { useEffect, useState, useCallback } from "react";
+
+import { useEffect, useState } from "react";
 
 interface CountdownTimerProps {
   targetDate: Date;
   onEnd?: () => void;
-  className?: string;
 }
 
-export const CountdownTimer = ({ targetDate, onEnd, className }: CountdownTimerProps) => {
+export const CountdownTimer = ({ targetDate, onEnd }: CountdownTimerProps) => {
   const [timeLeft, setTimeLeft] = useState<string>("");
   const [hasEnded, setHasEnded] = useState(false);
 
-  const calculateTimeLeft = useCallback(() => {
-    const now = new Date().getTime();
-    const target = new Date(targetDate).getTime();
-    const difference = target - now;
-
-    // Handle expired timer
-    if (difference <= 0) {
-      if (!hasEnded) {
-        setHasEnded(true);
-        setTimeLeft("Time's up!");
-        onEnd?.();
-      }
-      return null;
-    }
-
-    // Return seconds with one decimal place for smoother display
-    const seconds = (difference / 1000).toFixed(1);
-    return `${seconds}s`;
-  }, [targetDate, hasEnded, onEnd]);
-
   useEffect(() => {
-    // Reset state when target date changes
-    setHasEnded(false);
-    
+    const calculateTimeLeft = () => {
+      const now = new Date().getTime();
+      const target = new Date(targetDate).getTime();
+      const difference = target - now;
+
+      if (difference <= 0) {
+        if (!hasEnded) {
+          setHasEnded(true);
+          setTimeLeft("Time's up!");
+          onEnd?.();
+        }
+        return null;
+      }
+
+      const seconds = Math.floor(difference / 1000);
+      return `${seconds}s`;
+    };
+
     // Initial calculation
     const initialTimeLeft = calculateTimeLeft();
     if (initialTimeLeft !== null) {
       setTimeLeft(initialTimeLeft);
     }
 
-    // Update every 100ms for smooth countdown
+    // Update every 100ms for smoother countdown
     const timer = setInterval(() => {
       const result = calculateTimeLeft();
       if (result === null) {
@@ -51,7 +46,8 @@ export const CountdownTimer = ({ targetDate, onEnd, className }: CountdownTimerP
     }, 100);
 
     return () => clearInterval(timer);
-  }, [targetDate, calculateTimeLeft]);
+  }, [targetDate, onEnd, hasEnded]);
 
-  return <span className={className}>{timeLeft}</span>;
+  return <span>{timeLeft}</span>;
 };
+

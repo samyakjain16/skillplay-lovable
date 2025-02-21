@@ -1,37 +1,27 @@
-import { type Contest } from "../ContestTypes";
 
-const GAME_DURATION_MS = 30000; // 30 seconds
-
-interface ButtonState {
+type ButtonState = {
   text: string;
   variant: "default" | "secondary" | "destructive";
   disabled: boolean;
   showProgress: boolean;
   customClass: string;
-}
+};
 
-interface TimeStatus {
+type TimeStatus = {
   hasStarted: boolean;
   hasEnded: boolean;
   progress: number;
   currentGameIndex: number;
   remainingTime: number;
-  gameProgress: number;
-}
+};
 
 export const getTimeStatus = (startTime: string, endTime: string): TimeStatus => {
   const now = new Date();
   const start = new Date(startTime);
   const end = new Date(endTime);
-  
   const totalDuration = end.getTime() - start.getTime();
   const elapsed = now.getTime() - start.getTime();
-  const currentGameIndex = Math.floor(elapsed / GAME_DURATION_MS);
-  
-  // Calculate progress within current game
-  const gameElapsed = elapsed % GAME_DURATION_MS;
-  const gameProgress = Math.min((gameElapsed / GAME_DURATION_MS) * 100, 100);
-  
+  const currentGameIndex = Math.floor(elapsed / 30000); // 30 seconds per game
   const hasEnded = now > end;
   
   return {
@@ -39,62 +29,48 @@ export const getTimeStatus = (startTime: string, endTime: string): TimeStatus =>
     hasEnded,
     progress: Math.min(Math.max((elapsed / totalDuration) * 100, 0), 100),
     currentGameIndex: hasEnded ? 0 : currentGameIndex,
-    remainingTime: Math.max(end.getTime() - now.getTime(), 0),
-    gameProgress
+    remainingTime: end.getTime() - now.getTime()
   };
 };
 
 export const getContestState = (
-  contest: Contest,
+  contest: {
+    status: string;
+    start_time: string;
+    end_time: string;
+    current_participants: number;
+    max_participants: number;
+    series_count: number;
+  },
   isInMyContests?: boolean,
-  userCompletedGames?: boolean,
-  currentGameNumber?: number
+  userCompletedGames?: boolean
 ): ButtonState => {
-  const timeStatus = getTimeStatus(contest.start_time, contest.end_time);
+  const { hasStarted, hasEnded, currentGameIndex, remainingTime } = getTimeStatus(
+    contest.start_time,
+    contest.end_time
+  );
   const isContestFull = contest.current_participants >= contest.max_participants;
 
-  // Helper for consistent button styles
-  const getButtonStyle = (type: 'primary' | 'secondary' | 'disabled' | 'success') => {
-    const styles = {
-      primary: "bg-blue-500 hover:bg-blue-600 text-white",
-      secondary: "bg-gray-400 text-white cursor-not-allowed",
-      disabled: "bg-gray-400 text-white cursor-not-allowed opacity-75",
-      success: "bg-green-500 hover:bg-green-600 text-white"
-    };
-    return styles[type];
-  };
-
-  // For completed contests
-  if (contest.status === "completed") {
-    const isPrizeCalculated = contest.prize_calculation_status === 'completed';
+  // For completed contests or if the contest has ended
+  if (hasEnded || contest.status === "completed") {
     return {
-      text: "View Results",
+      text: "View Leaderboard",
       variant: "secondary",
-      disabled: !isPrizeCalculated,
+      disabled: false,
       showProgress: false,
-      customClass: isPrizeCalculated ? getButtonStyle('primary') : getButtonStyle('disabled'),
+      customClass: "bg-gray-600 hover:bg-gray-700 text-white",
     };
   }
 
   // For contests in My Contests
   if (isInMyContests) {
-    if (!timeStatus.hasStarted) {
+    if (!hasStarted) {
       return {
         text: "Starting Soon",
         variant: "secondary",
         disabled: true,
         showProgress: false,
-        customClass: getButtonStyle('secondary'),
-      };
-    }
-
-    if (timeStatus.hasEnded) {
-      return {
-        text: "Contest Ended",
-        variant: "secondary",
-        disabled: true,
-        showProgress: false,
-        customClass: getButtonStyle('secondary'),
+        customClass: "bg-gray-400 text-white cursor-not-allowed",
       };
     }
 
@@ -104,22 +80,16 @@ export const getContestState = (
         variant: "secondary",
         disabled: true,
         showProgress: false,
-        customClass: getButtonStyle('primary'),
+        customClass: "bg-blue-600 text-white",
       };
     }
 
-    // Show current game progress
-    const gameNumber = Math.min(
-      currentGameNumber ?? timeStatus.currentGameIndex,
-      contest.series_count - 1
-    ) + 1;
-    
     return {
-      text: `Game ${gameNumber}/${contest.series_count}`,
+      text: `Continue Game ${currentGameIndex + 1}`,
       variant: "default",
       disabled: false,
       showProgress: true,
-      customClass: getButtonStyle('primary'),
+      customClass: "bg-blue-500 hover:bg-blue-600 text-white",
     };
   }
 
@@ -130,25 +100,37 @@ export const getContestState = (
       variant: "secondary",
       disabled: true,
       showProgress: false,
-      customClass: getButtonStyle('disabled'),
+      customClass: "bg-gray-600 text-white",
     };
   }
 
-  if (!timeStatus.hasStarted) {
+  if (!hasStarted) {
     return {
       text: "Join Contest",
       variant: "default",
       disabled: false,
       showProgress: false,
-      customClass: getButtonStyle('success'),
+      customClass: "bg-green-500 hover:bg-green-600 text-white",
+    };
+  }
+
+  // Check if enough time to join
+  const minimumTimeNeeded = contest.series_count * 30000; // series_count * 30 seconds
+  if (remainingTime < minimumTimeNeeded) {
+    return {
+      text: "Ending Soon",
+      variant: "destructive",
+      disabled: true,
+      showProgress: false,
+      customClass: "bg-red-500 text-white",
     };
   }
 
   return {
-    text: "Join Now",
+    text: `Join Game ${currentGameIndex + 1}`,
     variant: "default",
     disabled: false,
-    showProgress: false,
-    customClass: getButtonStyle('success'),
+    showProgress: true,
+    customClass: "bg-green-500 hover:bg-green-600 text-white",
   };
 };
