@@ -36,3 +36,4 @@ export const transformDatabaseModels = (models: DatabasePrizeModel[]): Map<strin
     })
   );
 };
+
