@@ -13,7 +13,7 @@ export const CountdownTimer = ({ targetDate, onEnd }: CountdownTimerProps) => {
   useEffect(() => {
     const calculateTimeLeft = () => {
       const now = new Date().getTime();
-      const target = new Date(targetDate).getTime();
+      const target = targetDate.getTime();
       const difference = target - now;
 
       if (difference <= 0) {
@@ -50,4 +50,3 @@ export const CountdownTimer = ({ targetDate, onEnd }: CountdownTimerProps) => {
 
   return <span>{timeLeft}</span>;
 };
-

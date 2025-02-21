@@ -27,7 +27,14 @@ export const useContestState = (
 
   const getGameEndTime = (): Date | null => {
     if (!gameStartTime || timerInitialized.current === false) return null;
-    return new Date(gameStartTime.getTime() + 30000); // 30 seconds from start
+
+    // Calculate the remaining time based on when the game actually started
+    const now = new Date();
+    const elapsedTime = Math.max(0, Math.floor((now.getTime() - gameStartTime.getTime()) / 1000));
+    const remainingTime = Math.max(0, 30 - elapsedTime); // 30 seconds minus elapsed time
+
+    // Return the end time based on current time plus remaining seconds
+    return new Date(now.getTime() + (remainingTime * 1000));
   };
 
   const updateGameProgress = async () => {
@@ -39,7 +46,7 @@ export const useContestState = (
       updateInProgress.current = true;
       const now = new Date();
 
-      // Use a single query to get both contest and user_contest status
+      // Get both contest and user_contest status in a single query
       const { data, error } = await supabase
         .from('contests')
         .select(`
@@ -74,12 +81,14 @@ export const useContestState = (
         return;
       }
 
+      // Set the current game index from the database
+      setCurrentGameIndex(data.user_contests[0].current_game_index);
+
       // Only update game start time if it hasn't been set or if it's a new game
       if (!timerInitialized.current || 
           !data.user_contests[0].current_game_start_time || 
           currentGameIndex !== data.user_contests[0].current_game_index) {
         
-        setCurrentGameIndex(data.user_contests[0].current_game_index);
         setGameStartTime(now);
         timerInitialized.current = true;
 
