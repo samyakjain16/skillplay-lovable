@@ -27,6 +27,13 @@ interface GameContainerProps {
   initialProgress?: ContestProgress | null;
 }
 
+interface Contest {
+  id: string;
+  status: 'active' | 'completed';
+  series_count: number;
+  end_time: string;
+}
+
 export const GameContainer = ({ 
   contestId, 
   onGameComplete,
@@ -103,13 +110,13 @@ export const GameContainer = ({
     setGameStartTime,
     onGameComplete,
     refetchCompletedGames,
-    toast: toast.toast  // Pass the toast function directly
+    toast  // Pass toast directly
   });
 
   return (
     <>
       <GameInitializer
-        contest={contest}
+        contest={contest as Contest}
         contestGames={contestGames}
         user={user}
         completedGamesCount={completedGamesCount}
@@ -120,7 +127,7 @@ export const GameContainer = ({
       />
       
       <ContestCompletionHandler
-        contest={contest}
+        contest={contest as Contest}
         completedGamesCount={completedGamesCount}
         hasRedirected={hasRedirected}
       />

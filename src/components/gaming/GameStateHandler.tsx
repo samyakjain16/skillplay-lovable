@@ -3,7 +3,7 @@ import { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { QueryObserverResult, RefetchOptions } from "@tanstack/react-query";
 import type { Game } from "./hooks/types/gameTypes";
-import { toast as toastFn } from "@/hooks/use-toast";
+import { type Toast } from "@/hooks/use-toast";
 
 interface GameStateHandlerProps {
   user: User | null;
@@ -16,7 +16,7 @@ interface GameStateHandlerProps {
   setGameStartTime: (time: Date | null) => void;
   onGameComplete: (score: number, isFinalGame: boolean) => void;
   refetchCompletedGames: (options?: RefetchOptions) => Promise<QueryObserverResult<number, Error>>;
-  toast: typeof toastFn;
+  toast: (props: Toast) => void;
 }
 
 export const GameStateHandler = ({
@@ -124,7 +124,7 @@ export const GameStateHandler = ({
 
     } catch (error) {
       console.error("Error in handleGameEnd:", error);
-      toast.toast({
+      toast({
         variant: "destructive",
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to save game progress",
