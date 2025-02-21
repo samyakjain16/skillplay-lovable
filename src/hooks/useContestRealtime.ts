@@ -128,18 +128,21 @@ export const useContestRealtime = () => {
         },
         async (payload: RealtimePostgresChangesPayload<UserContest>) => {
           console.log('Received user contest update:', payload);
+          const userContest = payload.new as UserContest;
           
-          if (payload.new?.contest_id && shouldProcessUpdate(payload.new.contest_id)) {
-            // Fetch the latest contest data when a user_contests change occurs
-            const { data: contestData } = await supabase
-              .from('contests')
-              .select('*')
-              .eq('id', payload.new.contest_id)
-              .single();
+          if (!userContest || !userContest.contest_id || !shouldProcessUpdate(userContest.contest_id)) {
+            return;
+          }
 
-            if (contestData) {
-              await updateContestInQueries(contestData);
-            }
+          // Fetch the latest contest data when a user_contests change occurs
+          const { data: contestData } = await supabase
+            .from('contests')
+            .select('*')
+            .eq('id', userContest.contest_id)
+            .single();
+
+          if (contestData) {
+            await updateContestInQueries(contestData);
           }
         }
       )
