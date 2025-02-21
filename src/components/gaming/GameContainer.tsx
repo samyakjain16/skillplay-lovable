@@ -8,7 +8,7 @@ import { useContestState } from "./hooks/useContestState";
 import { GameProgress } from "./GameProgress";
 import { GameContent } from "./GameContent";
 import { GameStateHandler } from "./GameStateHandler";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { GameInitializer } from "./GameInitializer";
 import { ContestCompletionHandler } from "./ContestCompletionHandler";
 import { useRef } from "react";
@@ -34,7 +34,7 @@ export const GameContainer = ({
 }: GameContainerProps) => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const toast = useToast();
+  const { toast } = useToast();
   const hasRedirected = useRef(false);
   const gameEndInProgress = useRef(false);
   
@@ -103,7 +103,7 @@ export const GameContainer = ({
     setGameStartTime,
     onGameComplete,
     refetchCompletedGames,
-    toast
+    toast: toast.toast  // Pass the toast function directly
   });
 
   return (

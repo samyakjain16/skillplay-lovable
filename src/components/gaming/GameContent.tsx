@@ -4,7 +4,7 @@ import { CountdownTimer } from "./CountdownTimer";
 import { ArrangeSortGame } from "./games/ArrangeSortGame";
 import { TriviaGame } from "./games/TriviaGame";
 import { SpotDifferenceGame } from "./games/SpotDifferenceGame";
-import { useEffect, useCallback } from "react";
+import { useCallback } from "react";
 import { calculateScore } from "@/services/scoring/scoringRules";
 import { Loader2 } from "lucide-react";
 import { type Game } from "./hooks/types/gameTypes";

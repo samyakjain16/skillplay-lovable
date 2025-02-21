@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Navigation } from "@/components/Navigation";
 import { useNavigate, useParams } from "react-router-dom";
 import { GameContainer } from "@/components/gaming/GameContainer";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -16,6 +16,8 @@ interface ContestProgress {
   status: "completed" | "active";
   score: number;
   current_game_index: number;
+  current_game_start_time: string | null;
+  current_game_score: number;
   completed_at?: string;
 }
 
