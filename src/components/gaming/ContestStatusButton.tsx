@@ -39,7 +39,7 @@ export const ContestStatusButton = ({
               className="absolute inset-0 rounded-none" 
             />
           )}
-          <span className="relative z-10">{buttonState.text}</span>
+          <span className="relative">{buttonState.text}</span>
         </>
       )}
     </Button>
