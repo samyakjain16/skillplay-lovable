@@ -18,7 +18,19 @@ type TimeStatus = {
 export const getTimeStatus = (startTime: string, endTime: string): TimeStatus => {
   const now = new Date();
   const start = new Date(startTime);
-  const end = new Date(endTime);
+  const end = endTime ? new Date(endTime) : null;
+  
+  // If end time is null (contest hasn't started), consider it not ended
+  if (!end) {
+    return {
+      hasStarted: false,
+      hasEnded: false,
+      progress: 0,
+      currentGameIndex: 0,
+      remainingTime: 0
+    };
+  }
+
   const totalDuration = end.getTime() - start.getTime();
   const elapsed = now.getTime() - start.getTime();
   const currentGameIndex = Math.floor(elapsed / 30000); // 30 seconds per game
@@ -47,11 +59,12 @@ export const getContestState = (
   userCompletedGames?: boolean,
   currentGameNumber?: number
 ): ButtonState => {
-  const { hasStarted, hasEnded } = getTimeStatus(
-    contest.start_time,
-    contest.end_time
-  );
   const isContestFull = contest.current_participants >= contest.max_participants;
+
+  // If end_time is null, we need to handle it differently
+  const { hasStarted, hasEnded } = contest.end_time ? 
+    getTimeStatus(contest.start_time, contest.end_time) : 
+    { hasStarted: false, hasEnded: false };
 
   // For contests that have ended and are marked as completed
   if (contest.status === "completed") {
@@ -68,6 +81,17 @@ export const getContestState = (
 
   // For contests in My Contests
   if (isInMyContests) {
+    // Handle contests with fixed participants that haven't started
+    if (contest.status === "waiting_for_players") {
+      return {
+        text: "Waiting for Players",
+        variant: "secondary",
+        disabled: true,
+        showProgress: false,
+        customClass: "bg-gray-400 text-white cursor-not-allowed",
+      };
+    }
+
     if (!hasStarted) {
       return {
         text: "Starting Soon",
@@ -78,7 +102,7 @@ export const getContestState = (
       };
     }
 
-    if (hasEnded) {
+    if (hasEnded && contest.end_time) {
       return {
         text: "Contest Ended",
         variant: "secondary",
