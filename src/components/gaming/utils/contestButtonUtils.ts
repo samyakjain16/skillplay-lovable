@@ -54,40 +54,21 @@ export const getContestState = (
 
   // For completed contests
   if (contest.status === "completed") {
-    // Prize calculation in progress
-    if (contest.prize_calculation_status === 'in_progress') {
-      return {
-        text: "Calculating Results...",
-        variant: "secondary",
-        disabled: true,
-        showProgress: false,
-        customClass: "bg-gray-400 text-white cursor-not-allowed opacity-75",
-      };
-    }
-    // Prize calculation completed
-    if (contest.prize_calculation_status === 'completed') {
-      return {
-        text: "View Results",
-        variant: "secondary",
-        disabled: false,
-        showProgress: false,
-        customClass: "bg-primary hover:bg-primary/90 text-white",
-      };
-    }
-    // Prize calculation failed or pending
     return {
-      text: "Processing Results",
+      text: "View Results",
       variant: "secondary",
-      disabled: true,
+      disabled: contest.prize_calculation_status !== 'completed',
       showProgress: false,
-      customClass: "bg-gray-400 text-white cursor-not-allowed",
+      customClass: contest.prize_calculation_status === 'completed' 
+        ? "bg-primary hover:bg-primary/90 text-white"
+        : "bg-gray-400 text-white cursor-not-allowed opacity-75",
     };
   }
 
   // For contests that have ended but not marked as completed
   if (hasEnded) {
     return {
-      text: "Contest Ended",
+      text: "View Results",
       variant: "secondary",
       disabled: true,
       showProgress: false,
