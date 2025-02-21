@@ -32,8 +32,6 @@ export type DatabaseScoringRule = Omit<ScoringRule, 'conditions'> & {
   conditions: string | null;
 };
 
-// Updated to handle both string and Json types for distribution_rules
 export interface DatabasePrizeModel extends Omit<PrizeDistributionModel, 'distribution_rules'> {
-  distribution_rules: string | Record<string, number>;
+  distribution_rules: unknown;
 }
-

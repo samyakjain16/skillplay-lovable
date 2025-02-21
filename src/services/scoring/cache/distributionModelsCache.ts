@@ -22,9 +22,22 @@ export const setCachedModels = (models: Map<string, PrizeDistributionModel>) => 
 export const transformDatabaseModels = (models: DatabasePrizeModel[]): Map<string, PrizeDistributionModel> => {
   return new Map(
     models.map(model => {
-      const rules = typeof model.distribution_rules === 'string' 
-        ? JSON.parse(model.distribution_rules)
-        : model.distribution_rules;
+      let rules: Record<string, number>;
+      
+      if (typeof model.distribution_rules === 'string') {
+        // If it's a string, parse it
+        rules = JSON.parse(model.distribution_rules);
+      } else if (typeof model.distribution_rules === 'object' && model.distribution_rules !== null) {
+        // If it's already an object, validate and convert it
+        rules = Object.entries(model.distribution_rules).reduce((acc, [key, value]) => {
+          acc[key] = Number(value);
+          return acc;
+        }, {} as Record<string, number>);
+      } else {
+        // Default empty rules if invalid
+        console.warn(`Invalid distribution_rules format for model ${model.id}`);
+        rules = {};
+      }
 
       return [
         model.name,
@@ -36,4 +49,3 @@ export const transformDatabaseModels = (models: DatabasePrizeModel[]): Map<strin
     })
   );
 };
-
