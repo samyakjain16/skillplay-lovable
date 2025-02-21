@@ -46,22 +46,52 @@ export const getContestState = (
   isInMyContests?: boolean,
   userCompletedGames?: boolean
 ): ButtonState => {
-  const { hasStarted, hasEnded, currentGameIndex, remainingTime } = getTimeStatus(
+  const { hasStarted, hasEnded } = getTimeStatus(
     contest.start_time,
     contest.end_time
   );
   const isContestFull = contest.current_participants >= contest.max_participants;
 
-  // For completed contests or if the contest has ended
-  if (hasEnded || contest.status === "completed") {
+  // For completed contests
+  if (contest.status === "completed") {
+    // Prize calculation in progress
+    if (contest.prize_calculation_status === 'in_progress') {
+      return {
+        text: "Calculating Results...",
+        variant: "secondary",
+        disabled: true,
+        showProgress: false,
+        customClass: "bg-gray-400 text-white cursor-not-allowed opacity-75",
+      };
+    }
+    // Prize calculation completed
+    if (contest.prize_calculation_status === 'completed') {
+      return {
+        text: "View Results",
+        variant: "secondary",
+        disabled: false,
+        showProgress: false,
+        customClass: "bg-primary hover:bg-primary/90 text-white",
+      };
+    }
+    // Prize calculation failed or pending
     return {
-      text: "View Leaderboard",
+      text: "Processing Results",
       variant: "secondary",
-      disabled: contest.prize_calculation_status !== 'completed',
+      disabled: true,
       showProgress: false,
-      customClass: contest.prize_calculation_status === 'completed' 
-        ? "bg-gray-600 hover:bg-gray-700 text-white"
-        : "bg-gray-400 text-white cursor-not-allowed",
+      customClass: "bg-gray-400 text-white cursor-not-allowed",
+    };
+  }
+
+  // For contests that have ended but not marked as completed
+  if (hasEnded) {
+    return {
+      text: "Contest Ended",
+      variant: "secondary",
+      disabled: true,
+      showProgress: false,
+      customClass: "bg-gray-400 text-white cursor-not-allowed opacity-75",
     };
   }
 
@@ -88,7 +118,7 @@ export const getContestState = (
     }
 
     return {
-      text: `Continue Game ${currentGameIndex + 1}`,
+      text: "Continue Playing",
       variant: "default",
       disabled: false,
       showProgress: true,
@@ -117,23 +147,11 @@ export const getContestState = (
     };
   }
 
-  // Check if enough time to join
-  const minimumTimeNeeded = contest.series_count * 30000; // series_count * 30 seconds
-  if (remainingTime < minimumTimeNeeded) {
-    return {
-      text: "Ending Soon",
-      variant: "destructive",
-      disabled: true,
-      showProgress: false,
-      customClass: "bg-red-500 text-white",
-    };
-  }
-
   return {
-    text: `Join Game ${currentGameIndex + 1}`,
+    text: "Join Now",
     variant: "default",
     disabled: false,
-    showProgress: true,
+    showProgress: false,
     customClass: "bg-green-500 hover:bg-green-600 text-white",
   };
 };
