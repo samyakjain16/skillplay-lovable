@@ -53,8 +53,8 @@ export const getContestState = (
   );
   const isContestFull = contest.current_participants >= contest.max_participants;
 
-  // For completed contests
-  if (contest.status === "completed") {
+  // For contests that have ended
+  if (hasEnded || contest.status === "completed") {
     return {
       text: "View Results",
       variant: "secondary",
@@ -63,17 +63,6 @@ export const getContestState = (
       customClass: contest.prize_calculation_status === 'completed' 
         ? "bg-primary hover:bg-primary/90 text-white"
         : "bg-gray-400 text-white cursor-not-allowed opacity-75",
-    };
-  }
-
-  // For contests that have ended but not marked as completed
-  if (hasEnded) {
-    return {
-      text: "View Results",
-      variant: "secondary",
-      disabled: true,
-      showProgress: false,
-      customClass: "bg-gray-400 text-white cursor-not-allowed opacity-75",
     };
   }
 
