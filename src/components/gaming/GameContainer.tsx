@@ -1,3 +1,4 @@
+
 import { Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -40,7 +41,8 @@ export const GameContainer = ({
     getGameEndTime,
     updateGameProgress,
     toast,
-    gameEndInProgress
+    gameEndInProgress,
+    hasRedirected
   } = useContestState(contestId, user, initialProgress);
 
   const handleGameEnd = async (score: number) => {
