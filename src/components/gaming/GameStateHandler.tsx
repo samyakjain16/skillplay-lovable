@@ -1,6 +1,8 @@
+
 import { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { QueryObserverResult, RefetchOptions } from "@tanstack/react-query";
+import { type Toast } from "@/components/ui/use-toast";
 
 interface GameContent {
   game_content_id: string;
@@ -24,7 +26,9 @@ interface GameStateHandlerProps {
   setGameStartTime: (time: Date | null) => void;
   onGameComplete: (score: number, isFinalGame: boolean) => void;
   refetchCompletedGames: (options?: RefetchOptions) => Promise<QueryObserverResult<number, Error>>;
-  toast: any;
+  toast: {
+    toast: (props: { title: string; description: string; variant?: "default" | "destructive" }) => void;
+  };
 }
 
 export const GameStateHandler = ({
@@ -55,7 +59,7 @@ export const GameStateHandler = ({
         .from('contests')
         .select('series_count, status')
         .eq('id', contestId)
-        .single();
+        .maybeSingle();
 
       if (contestError || !currentContest) throw new Error("Contest not found");
       if (currentContest.status === 'completed') {
@@ -67,7 +71,7 @@ export const GameStateHandler = ({
         .select('score, current_game_index, status')
         .eq('contest_id', contestId)
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       if (userContestError || !userContest) throw new Error("User contest not found");
       if (userContest.status === 'completed') {
@@ -132,7 +136,7 @@ export const GameStateHandler = ({
 
     } catch (error) {
       console.error("Error in handleGameEnd:", error);
-      toast({
+      toast.toast({
         variant: "destructive",
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to save game progress",
