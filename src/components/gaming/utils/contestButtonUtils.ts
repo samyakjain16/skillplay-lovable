@@ -99,8 +99,9 @@ export const getContestState = (
     }
 
     // Use time-based game index for the button text
+    const gameNumber = Math.min(currentGameIndex, contest.series_count - 1);
     return {
-      text: `Continue Game ${currentGameIndex + 1}/${contest.series_count}`,
+      text: `Continue Game ${gameNumber + 1}/${contest.series_count}`,
       variant: "default",
       disabled: false,
       showProgress: true,
