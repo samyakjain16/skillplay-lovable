@@ -1,4 +1,4 @@
-import { type Contest } from "./ContestTypes";
+import { type Contest } from "../ContestTypes";
 
 const GAME_DURATION_MS = 30000; // 30 seconds
 

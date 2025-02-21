@@ -45,7 +45,6 @@ export const GameContent = ({
     try {
       const score = await calculateScore(
         currentGame.game_content.category,
-        isCorrect,
         timeTaken,
         additionalData
       );
