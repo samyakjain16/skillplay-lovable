@@ -105,7 +105,8 @@ export async function calculateGameScore(
 
     // Only calculate speed bonus for correct answers
     if (isCorrect) {
-      const speedBonus = calculateSpeedBonus(timeTaken, speedBonusRules);
+      // Pass 30 seconds as the game duration for the speed bonus calculation
+      const speedBonus = calculateSpeedBonus(timeTaken, 30, speedBonusRules);
       totalScore += speedBonus;
     }
 
