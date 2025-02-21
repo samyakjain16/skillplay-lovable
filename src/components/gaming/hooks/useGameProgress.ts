@@ -1,57 +1,19 @@
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
-
-interface GameProgress {
-  count: number;
-  lastCompletedGame?: {
-    game_content_id: string;
-    completed_at: string;
-    score: number;
-  };
-  currentGameStart?: string | null;
-}
+import { GameProgress } from "./types/gameProgressTypes";
+import { useGameProgressSubscription } from "./useGameProgressSubscription";
 
 export const useGameProgress = (contestId: string) => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
-  // Set up real-time subscription for game progress updates
-  useEffect(() => {
-    if (!user) return;
+  // Set up real-time subscription
+  useGameProgressSubscription(contestId, user);
 
-    const channel = supabase
-      .channel('game-progress')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'player_game_progress',
-          filter: `user_id=eq.${user.id} AND contest_id=eq.${contestId}`
-        },
-        (payload) => {
-          // Invalidate queries to trigger a refetch
-          queryClient.invalidateQueries({
-            queryKey: ["game-progress", contestId, user.id]
-          });
-          queryClient.invalidateQueries({
-            queryKey: ["detailed-game-progress", contestId, user.id]
-          });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [user, contestId, queryClient]);
-
-  return useQuery({
+  return useQuery<GameProgress>({
     queryKey: ["game-progress", contestId, user?.id],
     queryFn: async (): Promise<GameProgress> => {
       if (!user) return { count: 0 };
@@ -83,7 +45,6 @@ export const useGameProgress = (contestId: string) => {
             .maybeSingle()
         ]);
 
-        // Detailed error handling with user feedback
         if (completedGamesResult.error) {
           console.error("Error fetching completed games:", completedGamesResult.error);
           toast({
@@ -130,94 +91,14 @@ export const useGameProgress = (contestId: string) => {
       }
     },
     enabled: !!user,
-    staleTime: 1000, // Consider data stale after 1 second
-    gcTime: 30000, // Keep in cache for 30 seconds
+    staleTime: 1000,
+    gcTime: 30000,
     refetchInterval: (query) => {
-      // Refetch more frequently if there's an active game
       return query.state.data?.currentGameStart ? 1000 : 5000;
     },
-    retry: 3, // Retry failed requests up to 3 times
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
 };
 
-// Helper hook for detailed game progress
-export const useDetailedGameProgress = (contestId: string) => {
-  const { user } = useAuth();
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-
-  useEffect(() => {
-    if (!user) return;
-
-    // Set up real-time subscription for detailed game progress updates
-    const channel = supabase
-      .channel('detailed-game-progress')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'player_game_progress',
-          filter: `user_id=eq.${user.id} AND contest_id=eq.${contestId}`
-        },
-        (payload) => {
-          queryClient.invalidateQueries({
-            queryKey: ["detailed-game-progress", contestId, user.id]
-          });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [user, contestId, queryClient]);
-
-  return useQuery({
-    queryKey: ["detailed-game-progress", contestId, user?.id],
-    queryFn: async () => {
-      if (!user) return null;
-
-      try {
-        const { data, error } = await supabase
-          .from("player_game_progress")
-          .select(`
-            game_content_id,
-            score,
-            time_taken,
-            completed_at,
-            is_correct
-          `)
-          .eq("contest_id", contestId)
-          .eq("user_id", user.id)
-          .order("completed_at", { ascending: true });
-
-        if (error) {
-          console.error("Error fetching detailed game progress:", error);
-          toast({
-            variant: "destructive",
-            title: "Error fetching game details",
-            description: "Please try refreshing the page"
-          });
-          throw error;
-        }
-
-        return data;
-      } catch (error) {
-        console.error("Error in useDetailedGameProgress:", error);
-        toast({
-          variant: "destructive",
-            title: "Error fetching game details",
-            description: "Please try refreshing the page"
-        });
-        throw error;
-      }
-    },
-    enabled: !!user,
-    staleTime: 30000, // Consider data stale after 30 seconds
-    gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
-    retry: 3, // Retry failed requests up to 3 times
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
-  });
-};
+export { useDetailedGameProgress } from './useDetailedGameProgress';
