@@ -27,7 +27,7 @@ export const ContestStatusButton = ({
     <Button
       variant={buttonState.variant}
       disabled={buttonState.disabled || loading}
-      className={`w-full relative overflow-hidden ${buttonState.customClass}`}
+      className={`w-full relative ${buttonState.customClass}`}
     >
       {loading ? (
         <Loader2 className="h-4 w-4 animate-spin" />
@@ -36,10 +36,10 @@ export const ContestStatusButton = ({
           {buttonState.showProgress && (
             <Progress 
               value={progress} 
-              className="absolute inset-0 rounded-none" 
+              className="absolute inset-0" 
             />
           )}
-          <span className="relative">{buttonState.text}</span>
+          <span>{buttonState.text}</span>
         </>
       )}
     </Button>

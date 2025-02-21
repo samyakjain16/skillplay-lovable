@@ -1,5 +1,5 @@
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -24,6 +24,16 @@ export const useContestState = (
   const updateInProgress = useRef(false);
   const gameEndInProgress = useRef(false);
   const timerInitialized = useRef(false);
+  const progressInterval = useRef<number | null>(null);
+
+  // Cleanup interval on unmount
+  useEffect(() => {
+    return () => {
+      if (progressInterval.current) {
+        window.clearInterval(progressInterval.current);
+      }
+    };
+  }, []);
 
   const getGameEndTime = (): Date | null => {
     if (!gameStartTime || timerInitialized.current === false) return null;
@@ -43,7 +53,6 @@ export const useContestState = (
 
     try {
       updateInProgress.current = true;
-      console.log("Updating game progress for contest:", contestId);
 
       // Get current server-side state
       const { data: userContest, error: userContestError } = await supabase
@@ -51,10 +60,15 @@ export const useContestState = (
         .select('current_game_index, current_game_start_time, status')
         .eq('contest_id', contestId)
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       if (userContestError) {
         console.error('Error fetching user contest:', userContestError);
+        return;
+      }
+
+      if (!userContest) {
+        console.log('No user contest found');
         return;
       }
 
@@ -87,20 +101,14 @@ export const useContestState = (
       const elapsed = now.getTime() - startTime.getTime();
       const timeBasedGameIndex = Math.floor(elapsed / 30000); // 30 seconds per game
 
-      // Use the maximum of server's game index and time-based index
-      const appropriateGameIndex = Math.max(
-        userContest.current_game_index,
-        timeBasedGameIndex
-      );
-
-      // If we need to update the game index
-      if (appropriateGameIndex !== currentGameIndex) {
-        console.log('Syncing with appropriate game index:', appropriateGameIndex);
-        setCurrentGameIndex(appropriateGameIndex);
+      // Use the server's game index as source of truth
+      if (userContest.current_game_index !== currentGameIndex) {
+        console.log('Syncing with server game index:', userContest.current_game_index);
+        setCurrentGameIndex(userContest.current_game_index);
       }
 
       // Check if we've exceeded the series count
-      if (appropriateGameIndex >= contest.series_count) {
+      if (userContest.current_game_index >= contest.series_count) {
         console.log('All games completed');
         navigate('/gaming');
         return;
@@ -117,15 +125,17 @@ export const useContestState = (
           return;
         }
 
-        // Use server time
-        setGameStartTime(serverStartTime);
-        timerInitialized.current = true;
+        if (!gameStartTime || gameStartTime.getTime() !== serverStartTime.getTime()) {
+          // Use server time
+          setGameStartTime(serverStartTime);
+          timerInitialized.current = true;
+        }
       } else if (!timerInitialized.current) {
         // Only set new start time if timer isn't initialized
         const updateData = {
           current_game_start_time: now.toISOString(),
           status: 'active',
-          current_game_index: appropriateGameIndex
+          current_game_index: userContest.current_game_index
         };
 
         const { error: updateError } = await supabase
