@@ -1,4 +1,3 @@
-
 import { Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -38,7 +37,6 @@ export const GameContainer = ({
     currentGameIndex,
     setCurrentGameIndex,
     gameStartTime,
-    hasRedirected,
     getGameEndTime,
     updateGameProgress,
     toast,

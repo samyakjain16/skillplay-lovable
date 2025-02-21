@@ -25,7 +25,8 @@ export const CountdownTimer = ({ targetDate, onEnd }: CountdownTimerProps) => {
         return null;
       }
 
-      const seconds = Math.floor(difference / 1000);
+      // Round to nearest second for display
+      const seconds = Math.ceil(difference / 1000);
       return `${seconds}s`;
     };
 
