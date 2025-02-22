@@ -1,130 +1,20 @@
 
-import { useEffect, useRef, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { RealtimePostgresChangesPayload } from '@supabase/realtime-js';
-import { useToast } from "@/components/ui/use-toast";
-
-interface Contest {
-  id: string;
-  status: string;
-  current_participants: number;
-  start_time: string;
-  end_time: string;
-  updated_at: string;
-}
-
-interface MyContestParticipation {
-  id: string;
-  contest: Contest;
-}
-
-interface AvailableContest extends Contest {
-  description: string;
-  title: string;
-  prize_pool: number;
-  entry_fee: number;
-  max_participants: number;
-  prize_distribution_type: string;
-  series_count: number;
-}
+import { Contest, UserContest } from "@/types/contest";
+import { UpdateThrottler } from "@/utils/updateThrottling";
+import { useContestUpdater } from "./useContestUpdater";
 
 export const useContestRealtime = () => {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const lastUpdateRef = useRef<{ [key: string]: number }>({});
-  const [retryCount, setRetryCount] = useState(0);
-  const maxRetries = 3;
+  const { updateContestInQueries } = useContestUpdater();
+  const throttler = new UpdateThrottler();
 
-  const shouldProcessUpdate = (contestId: string) => {
-    const now = Date.now();
-    const lastUpdate = lastUpdateRef.current[contestId] || 0;
-    
-    // Implement exponential backoff for high-frequency updates
-    const minUpdateInterval = Math.min(200 * Math.pow(2, Object.keys(lastUpdateRef.current).length), 2000);
-    
-    if (now - lastUpdate < minUpdateInterval) {
-      console.log(`Update for contest ${contestId} throttled`);
-      return false;
-    }
-    
-    lastUpdateRef.current[contestId] = now;
-    return true;
-  };
-
-  // Clear update cache periodically to prevent memory leaks
   useEffect(() => {
+    // Set up cleanup interval for the throttler
     const cleanup = setInterval(() => {
-      const now = Date.now();
-      const newCache: { [key: string]: number } = {};
-      
-      Object.entries(lastUpdateRef.current).forEach(([contestId, timestamp]) => {
-        if (now - timestamp < 60000) { // Keep only last minute of updates
-          newCache[contestId] = timestamp;
-        }
-      });
-      
-      lastUpdateRef.current = newCache;
+      throttler.cleanup();
     }, 60000);
-
-    return () => clearInterval(cleanup);
-  }, []);
-
-  useEffect(() => {
-    const updateContestInQueries = async (contestData: Contest) => {
-      if (!contestData?.id) return;
-
-      try {
-        console.log('Updating contest data:', contestData);
-
-        // Update my-contests query
-        queryClient.setQueryData(['my-contests'], (oldData: any) => {
-          if (!oldData) return oldData;
-          return oldData.map((participation: MyContestParticipation) => {
-            if (participation.contest.id === contestData.id) {
-              return {
-                ...participation,
-                contest: { ...participation.contest, ...contestData }
-              };
-            }
-            return participation;
-          });
-        });
-
-        // Update available-contests query
-        queryClient.setQueryData(['available-contests'], (oldData: any) => {
-          if (!oldData) return oldData;
-          return oldData.map((contest: AvailableContest) => {
-            if (contest.id === contestData.id) {
-              return { ...contest, ...contestData };
-            }
-            return contest;
-          });
-        });
-
-        // Force immediate refetch to ensure data consistency
-        await Promise.all([
-          queryClient.invalidateQueries({ queryKey: ['my-contests'] }),
-          queryClient.invalidateQueries({ queryKey: ['available-contests'] })
-        ]);
-
-      } catch (error) {
-        console.error('Error updating contest data:', error);
-        if (retryCount < maxRetries) {
-          setRetryCount(prev => prev + 1);
-          // Retry with exponential backoff
-          setTimeout(() => {
-            updateContestInQueries(contestData);
-          }, Math.pow(2, retryCount) * 1000);
-        } else {
-          toast({
-            title: "Update Error",
-            description: "Failed to update contest data. Please refresh the page.",
-            variant: "destructive"
-          });
-        }
-      }
-    };
 
     // Set up real-time subscription with reconnection handling
     const setupSubscription = () => {
@@ -141,7 +31,7 @@ export const useContestRealtime = () => {
             console.log('Received contest update:', payload);
             const contestData = payload.new as Contest;
             
-            if (!contestData?.id || !shouldProcessUpdate(contestData.id)) return;
+            if (!contestData?.id || !throttler.shouldProcessUpdate(contestData.id)) return;
             
             await updateContestInQueries(contestData);
           }
@@ -157,12 +47,11 @@ export const useContestRealtime = () => {
             console.log('Received user contest update:', payload);
             const userContest = payload.new as UserContest;
             
-            if (!userContest || !userContest.contest_id || !shouldProcessUpdate(userContest.contest_id)) {
+            if (!userContest?.contest_id || !throttler.shouldProcessUpdate(userContest.contest_id)) {
               return;
             }
 
             try {
-              // Fetch the latest contest data when a user_contests change occurs
               const { data: contestData, error } = await supabase
                 .from('contests')
                 .select('*')
@@ -194,7 +83,8 @@ export const useContestRealtime = () => {
     const channel = setupSubscription();
 
     return () => {
+      clearInterval(cleanup);
       supabase.removeChannel(channel);
     };
-  }, [queryClient, retryCount, toast]);
+  }, []);
 };
