@@ -29,14 +29,6 @@ interface AvailableContest extends Contest {
   series_count: number;
 }
 
-interface UserContest {
-  id: string;
-  user_id: string;
-  contest_id: string;
-  status: string;
-  joined_at: string;
-}
-
 export const useContestRealtime = () => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -83,25 +75,16 @@ export const useContestRealtime = () => {
       if (!contestData?.id) return;
 
       try {
-        const now = new Date();
-        const endTime = contestData.end_time ? new Date(contestData.end_time) : null;
-        const hasEnded = endTime ? now > endTime : false;
-        
-        const finalContest = {
-          ...contestData,
-          status: hasEnded ? 'completed' : contestData.status
-        };
-
-        console.log('Updating contest data:', finalContest);
+        console.log('Updating contest data:', contestData);
 
         // Update my-contests query
         queryClient.setQueryData(['my-contests'], (oldData: any) => {
           if (!oldData) return oldData;
           return oldData.map((participation: MyContestParticipation) => {
-            if (participation.contest.id === finalContest.id) {
+            if (participation.contest.id === contestData.id) {
               return {
                 ...participation,
-                contest: { ...participation.contest, ...finalContest }
+                contest: { ...participation.contest, ...contestData }
               };
             }
             return participation;
@@ -112,8 +95,8 @@ export const useContestRealtime = () => {
         queryClient.setQueryData(['available-contests'], (oldData: any) => {
           if (!oldData) return oldData;
           return oldData.map((contest: AvailableContest) => {
-            if (contest.id === finalContest.id) {
-              return { ...contest, ...finalContest };
+            if (contest.id === contestData.id) {
+              return { ...contest, ...contestData };
             }
             return contest;
           });
@@ -192,7 +175,6 @@ export const useContestRealtime = () => {
               }
             } catch (error) {
               console.error('Error fetching contest data:', error);
-              // Handle error appropriately
             }
           }
         )
