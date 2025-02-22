@@ -94,41 +94,37 @@ export const useContestRealtime = () => {
 
         console.log('Updating contest data:', finalContest);
 
-        // Batch update both queries
-        await queryClient.executeOperation({
-          operation: async () => {
-            // Update my-contests query
-            queryClient.setQueriesData({ queryKey: ['my-contests'] }, (oldData: any) => {
-              if (!oldData) return oldData;
-              return oldData.map((participation: MyContestParticipation) => {
-                if (participation.contest.id === finalContest.id) {
-                  return {
-                    ...participation,
-                    contest: { ...participation.contest, ...finalContest }
-                  };
-                }
-                return participation;
-              });
-            });
-
-            // Update available-contests query
-            queryClient.setQueriesData({ queryKey: ['available-contests'] }, (oldData: any) => {
-              if (!oldData) return oldData;
-              return oldData.map((contest: AvailableContest) => {
-                if (contest.id === finalContest.id) {
-                  return { ...contest, ...finalContest };
-                }
-                return contest;
-              });
-            });
-
-            // Force immediate refetch to ensure data consistency
-            await Promise.all([
-              queryClient.invalidateQueries({ queryKey: ['my-contests'] }),
-              queryClient.invalidateQueries({ queryKey: ['available-contests'] })
-            ]);
-          }
+        // Update my-contests query
+        queryClient.setQueryData(['my-contests'], (oldData: any) => {
+          if (!oldData) return oldData;
+          return oldData.map((participation: MyContestParticipation) => {
+            if (participation.contest.id === finalContest.id) {
+              return {
+                ...participation,
+                contest: { ...participation.contest, ...finalContest }
+              };
+            }
+            return participation;
+          });
         });
+
+        // Update available-contests query
+        queryClient.setQueryData(['available-contests'], (oldData: any) => {
+          if (!oldData) return oldData;
+          return oldData.map((contest: AvailableContest) => {
+            if (contest.id === finalContest.id) {
+              return { ...contest, ...finalContest };
+            }
+            return contest;
+          });
+        });
+
+        // Force immediate refetch to ensure data consistency
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ['my-contests'] }),
+          queryClient.invalidateQueries({ queryKey: ['available-contests'] })
+        ]);
+
       } catch (error) {
         console.error('Error updating contest data:', error);
         if (retryCount < maxRetries) {
