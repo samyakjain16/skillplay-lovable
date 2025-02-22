@@ -79,7 +79,7 @@ export const ContestCard = ({
         contest.status === 'completed'
           ? 'cursor-pointer opacity-75'
           : isWaitingForPlayers && isInMyContests
-          ? 'cursor-default opacity-75'
+          ? 'cursor-default opacity-75 pointer-events-none'
           : (isStarting || isJoining) 
             ? 'cursor-wait' 
             : 'cursor-pointer'

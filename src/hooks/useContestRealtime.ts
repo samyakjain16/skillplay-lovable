@@ -1,114 +1,176 @@
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { RealtimePostgresChangesPayload } from '@supabase/realtime-js';
-import { Contest, UserContest } from "@/types/contest";
-import { UpdateThrottler } from "@/utils/updateThrottling";
-import { useContestUpdater } from "./useContestUpdater";
+
+interface Contest {
+  id: string;
+  status: string;
+  current_participants: number;
+  start_time: string;
+  end_time: string;
+  updated_at: string;
+}
+
+interface MyContestParticipation {
+  id: string;
+  contest: Contest;
+}
+
+interface AvailableContest extends Contest {
+  description: string;
+  title: string;
+  prize_pool: number;
+  entry_fee: number;
+  max_participants: number;
+  prize_distribution_type: string;
+  series_count: number;
+}
+
+interface UserContest {
+  id: string;
+  user_id: string;
+  contest_id: string;
+  status: string;
+  joined_at: string;
+}
 
 export const useContestRealtime = () => {
-  const { updateContestInQueries } = useContestUpdater();
-  const throttler = new UpdateThrottler();
+  const queryClient = useQueryClient();
+  const lastUpdateRef = useRef<{ [key: string]: number }>({});
+
+  const shouldProcessUpdate = (contestId: string) => {
+    const now = Date.now();
+    const lastUpdate = lastUpdateRef.current[contestId] || 0;
+    
+    // Only process updates that are at least 1 second apart
+    if (now - lastUpdate < 1000) {
+      return false;
+    }
+    
+    lastUpdateRef.current[contestId] = now;
+    return true;
+  };
 
   useEffect(() => {
-    console.log('Setting up real-time subscription for contests');
-    
-    // Set up cleanup interval for the throttler
-    const cleanup = setInterval(() => {
-      throttler.cleanup();
-    }, 60000);
+    const channel = supabase
+      .channel('contest-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'contests'
+        },
+        (payload: RealtimePostgresChangesPayload<Contest>) => {
+          const newContest = payload.new as Contest;
+          const oldContest = payload.old as Partial<Contest>;
+          
+          if (!newContest?.id || !shouldProcessUpdate(newContest.id)) return;
 
-    // Set up real-time subscription with reconnection handling
-    const setupSubscription = () => {
-      const channel = supabase
-        .channel('contest-changes')
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'contests'
-          },
-          async (payload: RealtimePostgresChangesPayload<Contest>) => {
-            console.log('Received contest update:', payload);
-            const contestData = payload.new as Contest;
-            
-            if (!contestData?.id) {
-              console.warn('Received invalid contest data:', contestData);
-              return;
-            }
-            
-            if (!throttler.shouldProcessUpdate(contestData.id)) {
-              console.log(`Update for contest ${contestData.id} was throttled`);
-              return;
-            }
+          console.log('Processing contest update:', payload);
 
-            console.log('Processing contest update:', contestData);
-            await updateContestInQueries(contestData);
+          const now = new Date();
+          const endTime = new Date(newContest.end_time);
+          const hasEnded = now > endTime || newContest.status === 'completed';
+
+          // If already completed, don't process further updates
+          if (oldContest?.status === 'completed' && newContest.status === 'completed') {
+            return;
           }
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'user_contests'
-          },
-          async (payload: RealtimePostgresChangesPayload<UserContest>) => {
-            console.log('Received user contest update:', payload);
-            const userContest = payload.new as UserContest;
-            
-            if (!userContest?.contest_id) {
-              console.warn('Received invalid user contest data:', userContest);
-              return;
-            }
-            
-            if (!throttler.shouldProcessUpdate(userContest.contest_id)) {
-              console.log(`Update for user contest ${userContest.contest_id} was throttled`);
-              return;
-            }
 
-            try {
-              const { data: contestData, error } = await supabase
-                .from('contests')
-                .select('*')
-                .eq('id', userContest.contest_id)
-                .single();
+          const finalContest = {
+            ...newContest,
+            status: hasEnded ? 'completed' : newContest.status
+          };
 
-              if (error) {
-                console.error('Error fetching contest data:', error);
-                throw error;
-              }
-              
-              if (contestData) {
-                console.log('Processing related contest update:', contestData);
-                await updateContestInQueries(contestData);
-              }
-            } catch (error) {
-              console.error('Error processing user contest update:', error);
+          // Update my-contests query data
+          queryClient.setQueryData<MyContestParticipation[] | undefined>(
+            ['my-contests'], 
+            (oldData) => {
+              if (!oldData) return oldData;
+              return oldData.map((participation) => {
+                if (participation.contest.id === finalContest.id) {
+                  // Only update if the status or other relevant fields have changed
+                  if (participation.contest.status !== finalContest.status ||
+                      participation.contest.current_participants !== finalContest.current_participants) {
+                    return {
+                      ...participation,
+                      contest: { ...participation.contest, ...finalContest }
+                    };
+                  }
+                }
+                return participation;
+              });
             }
+          );
+
+          // Update available-contests query data
+          queryClient.setQueryData<AvailableContest[] | undefined>(
+            ['available-contests'], 
+            (oldData) => {
+              if (!oldData) return oldData;
+              return oldData.map((contest) => {
+                if (contest.id === finalContest.id) {
+                  // Only update if there are actual changes
+                  if (contest.status !== finalContest.status ||
+                      contest.current_participants !== finalContest.current_participants) {
+                    return { ...contest, ...finalContest };
+                  }
+                }
+                return contest;
+              });
+            }
+          );
+
+          // If contest has ended or status changed, force refetch
+          if (hasEnded || (oldContest && oldContest.status !== finalContest.status)) {
+            queryClient.invalidateQueries({ queryKey: ["my-contests"] });
+            queryClient.invalidateQueries({ queryKey: ["available-contests"] });
           }
-        )
-        .subscribe(async (status) => {
-          console.log('Subscription status:', status);
-          if (status === 'SUBSCRIBED') {
-            console.log('Successfully subscribed to contest changes');
-          } else if (status === 'CHANNEL_ERROR') {
-            console.error('Channel error, attempting to reconnect...');
-            await supabase.removeChannel(channel);
-            setTimeout(setupSubscription, 1000);
+
+          // Update single contest query if it exists
+          queryClient.setQueryData(
+            ['contest', finalContest.id],
+            (oldData: any) => {
+              if (!oldData) return oldData;
+              return { ...oldData, ...finalContest };
+            }
+          );
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_contests'
+        },
+        (payload: RealtimePostgresChangesPayload<UserContest>) => {
+          console.log('Received user contest update:', payload);
+          
+          // Force immediate refetch of my-contests
+          queryClient.invalidateQueries({ queryKey: ['my-contests'] });
+          queryClient.refetchQueries({ queryKey: ['my-contests'] });
+
+          // Type guard to ensure payload.new is UserContest
+          const newUserContest = payload.new as UserContest;
+          if (newUserContest && 'contest_id' in newUserContest) {
+            queryClient.invalidateQueries({ 
+              queryKey: ['contest', newUserContest.contest_id] 
+            });
+            // Also refetch available contests to update button states
+            queryClient.invalidateQueries({ 
+              queryKey: ['available-contests'] 
+            });
           }
-        });
-
-      return channel;
-    };
-
-    const channel = setupSubscription();
+        }
+      )
+      .subscribe();
 
     return () => {
-      console.log('Cleaning up contest real-time subscription');
-      clearInterval(cleanup);
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [queryClient]);
 };

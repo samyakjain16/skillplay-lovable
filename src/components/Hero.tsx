@@ -1,11 +1,12 @@
+
 import { ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+
 export const Hero = () => {
   const navigate = useNavigate();
-  const {
-    user
-  } = useAuth();
+  const { user } = useAuth();
+
   const handleGetStarted = () => {
     if (user) {
       navigate('/contests');
@@ -13,7 +14,9 @@ export const Hero = () => {
       navigate('/auth');
     }
   };
-  return <section className="pt-32 pb-20 px-4 rounded-sm">
+
+  return (
+    <section className="pt-32 pb-20 px-4">
       <div className="max-w-7xl mx-auto text-center">
         <span className="inline-block animate-fade-in px-4 py-1.5 mb-6 text-sm font-medium bg-primary/10 text-primary rounded-full">
          Join players across Australia and get in on the action!
@@ -26,7 +29,7 @@ export const Hero = () => {
           Join engaging contests and compete for real money prizes.
         </p>
         <div className="animate-fade-up animation-delay-200 flex flex-col sm:flex-row gap-4 justify-center">
-          <button onClick={handleGetStarted} className="btn-primary inline-flex items-center rounded-md">
+          <button onClick={handleGetStarted} className="btn-primary inline-flex items-center">
             Get Started <ArrowRight className="ml-2" size={20} />
           </button>
           <button className="px-6 py-3 text-secondary font-medium hover:bg-gray-100 rounded-full transition-colors">
@@ -34,5 +37,6 @@ export const Hero = () => {
           </button>
         </div>
       </div>
-    </section>;
+    </section>
+  );
 };

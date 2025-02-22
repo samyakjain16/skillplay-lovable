@@ -9,38 +9,6 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      contest_game_times: {
-        Row: {
-          contest_id: string
-          end_time: string
-          game_index: number
-          id: string
-          start_time: string
-        }
-        Insert: {
-          contest_id: string
-          end_time: string
-          game_index: number
-          id?: string
-          start_time: string
-        }
-        Update: {
-          contest_id?: string
-          end_time?: string
-          game_index?: number
-          id?: string
-          start_time?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "contest_game_times_contest_id_fkey"
-            columns: ["contest_id"]
-            isOneToOne: false
-            referencedRelation: "contests"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       contest_games: {
         Row: {
           contest_id: string
@@ -494,17 +462,6 @@ export type Database = {
           games_completed: number
           average_time: number
           rank: number
-          completion_rank: number
-        }[]
-      }
-      get_or_create_game_time_slot: {
-        Args: {
-          p_contest_id: string
-          p_game_index: number
-        }
-        Returns: {
-          start_time: string
-          end_time: string
         }[]
       }
       join_contest: {

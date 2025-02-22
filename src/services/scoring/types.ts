@@ -33,5 +33,5 @@ export type DatabaseScoringRule = Omit<ScoringRule, 'conditions'> & {
 };
 
 export interface DatabasePrizeModel extends Omit<PrizeDistributionModel, 'distribution_rules'> {
-  distribution_rules: unknown;
+  distribution_rules: string;
 }
