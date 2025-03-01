@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { calculatePrizeDistribution } from "@/services/scoring/prizeDistribution";
 import { useToast } from "@/components/ui/use-toast";
-import { Trophy } from "lucide-react";
+import { Trophy, Clock, Award, CheckCircle } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { useEffect, useState } from "react";
 
 // Define types for our leaderboard data
 interface LeaderboardEntry {
@@ -17,15 +18,29 @@ interface LeaderboardEntry {
   rank: number;
   username?: string | null;
   prize?: number;
+  games_completed?: number;
+  average_time?: number;
 }
 
 const ContestLeaderboard = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // Auto-refresh timer for in-progress contests
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    if (contest?.status === 'in_progress') {
+      timer = setTimeout(() => {
+        setRefreshKey(prev => prev + 1);
+      }, 10000); // Refresh every 10 seconds for in-progress contests
+    }
+    return () => clearTimeout(timer);
+  }, [refreshKey]);
 
   const { data: contest } = useQuery({
-    queryKey: ["contest", id],
+    queryKey: ["contest", id, refreshKey],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("contests")
@@ -41,8 +56,8 @@ const ContestLeaderboard = () => {
     }
   });
 
-  const { data: leaderboard, isLoading } = useQuery<LeaderboardEntry[]>({
-    queryKey: ["contest-leaderboard", id],
+  const { data: leaderboard, isLoading } = useQuery({
+    queryKey: ["contest-leaderboard", id, refreshKey],
     queryFn: async () => {
       if (!contest || !id) return [];
 
@@ -116,8 +131,42 @@ const ContestLeaderboard = () => {
       }
     },
     enabled: !!contest && !!id,
-    refetchInterval: (contest?.status === 'in_progress') ? 5000 : false
+    refetchInterval: (contest?.status === 'in_progress') ? 10000 : false
   });
+
+  const getStatusIndicator = () => {
+    if (!contest) return null;
+    
+    switch(contest.status) {
+      case 'in_progress':
+        return (
+          <div className="flex items-center gap-2 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
+            <Clock className="h-4 w-4" />
+            <span>Contest in progress</span>
+          </div>
+        );
+      case 'completed':
+        return (
+          <div className="flex items-center gap-2 px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm">
+            <CheckCircle className="h-4 w-4" />
+            <span>Contest completed</span>
+          </div>
+        );
+      case 'waiting_for_players':
+        return (
+          <div className="flex items-center gap-2 px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm">
+            <Clock className="h-4 w-4" />
+            <span>Waiting for players</span>
+          </div>
+        );
+      default:
+        return (
+          <div className="flex items-center gap-2 px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm">
+            <span className="capitalize">{contest.status}</span>
+          </div>
+        );
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -126,21 +175,32 @@ const ContestLeaderboard = () => {
       <main className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">
           <Card className="mb-8 p-6">
-            <h1 className="text-3xl font-bold mb-2">
-              Contest Leaderboard
-            </h1>
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4">
+              <h1 className="text-3xl font-bold">
+                Contest Leaderboard
+              </h1>
+              {getStatusIndicator()}
+            </div>
+            
             {contest && (
               <div>
                 <p className="text-muted-foreground">{contest.title}</p>
                 <p className="text-sm text-muted-foreground mt-2">
-                  Status: <span className="capitalize">{contest.status}</span>
+                  {contest.series_count} games • {contest.current_participants} participants
                 </p>
-                {contest.status === 'completed' && contest.prize_pool > 0 && (
+                
+                {contest.prize_pool > 0 && (
                   <div className="mt-4 p-4 bg-primary/5 rounded-lg">
                     <div className="flex items-center gap-2 text-primary">
                       <Trophy className="h-5 w-5" />
                       <span className="font-semibold">Total Prize Pool: ${contest.prize_pool}</span>
                     </div>
+                    
+                    {contest.status === 'completed' && contest.prize_calculation_status === 'in_progress' && (
+                      <div className="mt-2 text-sm text-amber-600">
+                        Finalizing prize distribution...
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -160,7 +220,9 @@ const ContestLeaderboard = () => {
                       <th className="text-left p-4">Rank</th>
                       <th className="text-left p-4">Player</th>
                       <th className="text-right p-4">Score</th>
-                      {contest?.status === 'completed' && contest.prize_pool > 0 && (
+                      <th className="text-right p-4 hidden md:table-cell">Games</th>
+                      <th className="text-right p-4 hidden md:table-cell">Avg. Time</th>
+                      {contest?.prize_pool > 0 && (
                         <th className="text-right p-4">Prize</th>
                       )}
                     </tr>
@@ -172,12 +234,20 @@ const ContestLeaderboard = () => {
                         <td className="p-4">
                           {entry.username || 'Anonymous'}
                         </td>
-                        <td className="p-4 text-right">
+                        <td className="p-4 text-right font-medium">
                           {entry.total_score.toLocaleString()}
                         </td>
-                        {contest?.status === 'completed' && contest.prize_pool > 0 && (
+                        <td className="p-4 text-right hidden md:table-cell">
+                          {entry.games_completed || 0}/{contest?.series_count || 3}
+                        </td>
+                        <td className="p-4 text-right hidden md:table-cell">
+                          {entry.average_time ? `${Math.round(entry.average_time)}s` : '-'}
+                        </td>
+                        {contest?.prize_pool > 0 && (
                           <td className="p-4 text-right font-medium">
-                            {entry.prize ? `$${entry.prize.toFixed(2)}` : '-'}
+                            {entry.prize && contest.status === 'completed' 
+                              ? `$${entry.prize.toFixed(2)}` 
+                              : (contest.status === 'completed' ? '-' : 'Pending')}
                           </td>
                         )}
                       </tr>
@@ -192,10 +262,17 @@ const ContestLeaderboard = () => {
             </Card>
           )}
           
-          <div className="mt-8 flex justify-center">
+          <div className="mt-8 flex justify-center gap-4">
+            <Button
+              onClick={() => setRefreshKey(prev => prev + 1)}
+              variant="outline"
+              className="w-1/3 max-w-[160px]"
+            >
+              Refresh
+            </Button>
             <Button
               onClick={() => navigate('/gaming')}
-              className="w-full max-w-md"
+              className="w-2/3 max-w-md"
             >
               Return to Gaming
             </Button>

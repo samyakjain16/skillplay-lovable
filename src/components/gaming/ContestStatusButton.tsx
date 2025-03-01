@@ -1,5 +1,6 @@
+
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
+import { Loader2, CheckCircle, Clock } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getTimeStatus } from "./utils/contestButtonUtils";
@@ -7,6 +8,7 @@ import { ContestProgressBar } from "./ContestProgressBar";
 import { type Contest } from "./ContestTypes";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { ContestButtonStatus } from "@/services/scoring/types";
 
 interface ContestStatusButtonProps {
   contest: Pick<Contest, "id" | "status" | "start_time" | "end_time" | "current_participants" | "max_participants" | "series_count" | "contest_type">;
@@ -27,6 +29,7 @@ export const ContestStatusButton = ({
   const [localLoading, setLocalLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [currentGameNumber, setCurrentGameNumber] = useState<number | null>(null);
+  const [buttonStatus, setButtonStatus] = useState<ContestButtonStatus>('join_contest');
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const gameCheckIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const queryClient = useQueryClient();
@@ -40,6 +43,7 @@ export const ContestStatusButton = ({
         .from('contests')
         .select(`
           start_time,
+          status,
           user_contests!inner (
             current_game_index,
             completed_games,
@@ -53,6 +57,12 @@ export const ContestStatusButton = ({
 
       const userContest = contestData[0].user_contests[0];
       const completedGames = userContest.completed_games || [];
+      
+      // If contest is completed, update button status
+      if (contestData[0].status === 'completed') {
+        setButtonStatus('view_leaderboard');
+        return;
+      }
       
       // Calculate time-based game number
       const contestStartTime = new Date(contestData[0].start_time);
@@ -70,6 +80,14 @@ export const ContestStatusButton = ({
       // Only update if it's within the series count
       if (effectiveGameNumber <= contest.series_count) {
         setCurrentGameNumber(effectiveGameNumber);
+        
+        // Update button status based on game number
+        const remainingGames = contest.series_count - completedGames.length;
+        if (remainingGames === 0) {
+          setButtonStatus('games_completed');
+        } else {
+          setButtonStatus('continue_game');
+        }
       }
     } catch (error) {
       console.error('Error fetching game number:', error);
@@ -101,6 +119,10 @@ export const ContestStatusButton = ({
           intervalRef.current = null;
         }
         queryClient.invalidateQueries({ queryKey: ["contest", contest.id] });
+        
+        if (isInMyContests) {
+          setButtonStatus('view_leaderboard');
+        }
       }
     };
 
@@ -123,7 +145,39 @@ export const ContestStatusButton = ({
         intervalRef.current = null;
       }
     };
-  }, [contest.status, contest.id, contest.start_time, contest.end_time, queryClient]);
+  }, [contest.status, contest.id, contest.start_time, contest.end_time, queryClient, isInMyContests]);
+  
+  // Effect to determine button status based on contest state
+  useEffect(() => {
+    // Non-joined contests
+    if (!isInMyContests) {
+      if (contest.current_participants >= contest.max_participants) {
+        setButtonStatus('contest_full');
+      } else {
+        setButtonStatus('join_contest');
+      }
+      return;
+    }
+    
+    // Joined contests
+    if (userCompletedGames) {
+      setButtonStatus('games_completed');
+    } else if (contest.status === 'completed') {
+      setButtonStatus('view_leaderboard');
+    } else if (contest.status === 'in_progress') {
+      if (currentGameNumber) {
+        setButtonStatus('continue_game');
+      } else {
+        // Default for in-progress contests
+        setButtonStatus('continue_game');
+      }
+    } else if (contest.status === 'waiting_for_players') {
+      setButtonStatus('waiting_for_players');
+    } else {
+      // Default for other statuses
+      setButtonStatus(contest.status === 'upcoming' ? 'join_contest' : 'view_leaderboard');
+    }
+  }, [contest.status, contest.current_participants, contest.max_participants, isInMyContests, userCompletedGames, currentGameNumber]);
 
   const handleClick = async () => {
     if (loading || buttonState.disabled) return;
@@ -136,59 +190,87 @@ export const ContestStatusButton = ({
     }
   };
 
-  let buttonText = "Join Contest";
-  if (!isInMyContests && contest.contest_type === 'fixed_participants') {
-    buttonText = `Join (${contest.current_participants}/${contest.max_participants})`;
-  }
-
-  const buttonState = {
-    text: buttonText,
-    variant: "default" as const,
-    disabled: false,
-    showProgress: contest.status === "in_progress",
-    customClass: "bg-green-500 hover:bg-green-600 text-white"
+  // Button text mapper
+  const getButtonText = (): string => {
+    switch (buttonStatus) {
+      case 'join_contest':
+        return contest.contest_type === 'fixed_participants' 
+          ? `Join (${contest.current_participants}/${contest.max_participants})` 
+          : "Join Contest";
+      case 'waiting_for_players':
+        return `Waiting for Players (${contest.current_participants}/${contest.max_participants})`;
+      case 'continue_game':
+        return currentGameNumber 
+          ? `Continue Game ${currentGameNumber}/${contest.series_count}`
+          : "Continue Playing";
+      case 'games_completed':
+        return "Games Completed";
+      case 'view_leaderboard':
+        return "View Leaderboard";
+      case 'contest_full':
+        return "Contest Full";
+      case 'finalizing_results':
+        return "Finalizing Results...";
+      case 'starting_countdown':
+        return "Starting Soon...";
+      default:
+        return "Join Contest";
+    }
   };
 
-  if (isInMyContests) {
-    const isWaitingForPlayers = 
-      contest.contest_type === 'fixed_participants' && 
-      contest.current_participants < contest.max_participants;
+  // Button style and state mapper
+  const getButtonState = () => {
+    const styles = {
+      disabled: false,
+      showProgress: contest.status === "in_progress",
+      customClass: "bg-green-500 hover:bg-green-600 text-white"
+    };
 
-    if (isWaitingForPlayers) {
-      buttonState.text = `Waiting for Players (${contest.current_participants}/${contest.max_participants})`;
-      buttonState.disabled = true;
-      buttonState.customClass = "bg-gray-400 text-white cursor-not-allowed";
-    } else if (contest.status === "completed") {
-      buttonState.text = "View Leaderboard";
-      buttonState.variant = "default";
-      buttonState.customClass = "bg-gray-600 hover:bg-gray-700 text-white";
-    } else if (userCompletedGames) {
-      buttonState.text = "Games Completed";
-      buttonState.disabled = true;
-      buttonState.customClass = "bg-blue-600 text-white";
-    } else if (contest.status === "in_progress") {
-      buttonState.text = currentGameNumber 
-        ? `Continue Game ${currentGameNumber}/${contest.series_count}`
-        : "Continue Playing";
-      buttonState.customClass = "bg-blue-500 hover:bg-blue-600 text-white";
-    } else {
-      buttonState.text = "Start Playing";
-      buttonState.customClass = "bg-blue-500 hover:bg-blue-600 text-white";
+    switch (buttonStatus) {
+      case 'join_contest':
+        styles.customClass = "bg-green-500 hover:bg-green-600 text-white";
+        break;
+      case 'waiting_for_players':
+        styles.disabled = true;
+        styles.customClass = "bg-gray-400 text-white cursor-not-allowed";
+        break;
+      case 'continue_game':
+        styles.customClass = "bg-blue-500 hover:bg-blue-600 text-white";
+        break;
+      case 'games_completed':
+        styles.disabled = true;
+        styles.customClass = "bg-blue-600 text-white";
+        break;
+      case 'view_leaderboard':
+        styles.customClass = "bg-gray-600 hover:bg-gray-700 text-white";
+        break;
+      case 'contest_full':
+        styles.disabled = true;
+        styles.customClass = "bg-gray-600 text-white";
+        break;
+      case 'finalizing_results':
+        styles.disabled = true;
+        styles.customClass = "bg-amber-500 text-white";
+        break;
+      case 'starting_countdown':
+        styles.disabled = true;
+        styles.customClass = "bg-amber-500 text-white";
+        break;
+      default:
+        styles.customClass = "bg-green-500 hover:bg-green-600 text-white";
     }
-  } else {
-    if (contest.current_participants >= contest.max_participants) {
-      buttonState.text = "Contest Full";
-      buttonState.variant = "default";
-      buttonState.disabled = true;
-      buttonState.customClass = "bg-gray-600 text-white";
-    }
-  }
+
+    return styles;
+  };
+
+  const buttonText = getButtonText();
+  const buttonState = getButtonState();
 
   return (
     <div className="relative w-full">
       <Button 
         className={`w-full relative overflow-hidden transition-all duration-500 ${buttonState.customClass}`}
-        variant={buttonState.variant}
+        variant="default"
         disabled={localLoading || buttonState.disabled}
         onClick={handleClick}
       >
@@ -199,11 +281,15 @@ export const ContestStatusButton = ({
           </>
         ) : buttonState.showProgress ? (
           <>
-            <span className="relative z-10">{buttonState.text}</span>
+            <span className="relative z-10">{buttonText}</span>
             <ContestProgressBar progress={progress} />
           </>
         ) : (
-          buttonState.text
+          <>
+            {buttonStatus === 'waiting_for_players' && <Clock className="mr-2 h-4 w-4" />}
+            {buttonStatus === 'games_completed' && <CheckCircle className="mr-2 h-4 w-4" />}
+            {buttonText}
+          </>
         )}
       </Button>
     </div>

@@ -1,3 +1,4 @@
+
 import { useEffect, useCallback } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { useNavigate } from "react-router-dom";
@@ -24,19 +25,20 @@ export const ContestCompletionHandler = ({
       // Check contest status from server
       const { data: currentContest } = await supabase
         .from('contests')
-        .select('status, end_time')
+        .select('status, end_time, series_count')
         .eq('id', contest.id)
         .single();
 
       const now = new Date();
       const contestEnd = new Date(currentContest?.end_time || contest.end_time);
+      const seriesCount = currentContest?.series_count || contest.series_count;
 
       // Check if contest has ended either by time or status
       if ((now > contestEnd || currentContest?.status === 'completed') && !hasRedirected.current) {
         hasRedirected.current = true;
 
         // Check if user has completed all games
-        if (completedGamesCount && completedGamesCount >= contest.series_count) {
+        if (completedGamesCount && completedGamesCount >= seriesCount) {
           toast({
             title: "Contest Ended",
             description: "You've completed all games. Redirecting to leaderboard...",
@@ -44,24 +46,31 @@ export const ContestCompletionHandler = ({
         } else {
           toast({
             title: "Contest Ended",
-            description: "This contest has ended. Redirecting to leaderboard...",
+            description: "Time's up! Redirecting to leaderboard...",
           });
         }
 
-        navigate(`/contest/${contest.id}/leaderboard`);
+        // Small delay to allow toast to be seen
+        setTimeout(() => {
+          navigate(`/contest/${contest.id}/leaderboard`);
+        }, 1500);
         return true;
       }
 
       // Check if all games are completed but contest hasn't ended
       if (completedGamesCount && 
-          completedGamesCount >= contest.series_count && 
+          completedGamesCount >= seriesCount && 
           !hasRedirected.current) {
         hasRedirected.current = true;
         toast({
           title: "Games Completed",
           description: "You've completed all games. Check back when the contest ends to see the final results!",
         });
-        navigate('/gaming');
+        
+        // Small delay to allow toast to be seen
+        setTimeout(() => {
+          navigate('/gaming');
+        }, 1500);
         return true;
       }
 

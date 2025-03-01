@@ -130,6 +130,10 @@ function evaluateConditions(
       return data.score === 100;
     case 'quick_completion':
       return data.timeTaken && data.timeTaken < conditions.threshold;
+    case 'all_items_arranged':
+      return data.arrangedItems === data.totalItems;
+    case 'memory_accuracy':
+      return data.correctCells && data.correctCells >= conditions.min_correct;
     default:
       return false;
   }
@@ -137,7 +141,7 @@ function evaluateConditions(
 
 /**
  * Calculate speed bonus based on time taken to complete the game
- * Following the new tiered bonus structure:
+ * Following the specified tiered bonus structure:
  * - ≤ 5 seconds: +8 points
  * - 5-10 seconds: +6 points
  * - 10-15 seconds: +4 points
@@ -157,8 +161,27 @@ function calculateSpeedBonus(timeTaken: number): number {
   return 0;
 }
 
+// Function that provides detailed breakdown of the score calculation
+export function getScoreBreakdown(
+  basePoints: number, 
+  speedBonus: number, 
+  additionalPoints: number = 0
+): { total: number; breakdown: Record<string, number> } {
+  const breakdown = {
+    basePoints,
+    speedBonus,
+    additionalPoints,
+  };
+  
+  const total = basePoints + speedBonus + additionalPoints;
+  
+  return {
+    total,
+    breakdown
+  };
+}
+
 // Legacy function kept for compatibility with existing database rules
-// This will be used if we still have speed bonus rules in the database
 function calculateDatabaseSpeedBonus(
   submissionTime: number, // Time at which the answer was submitted
   gameDuration: number, // Total game duration (30 sec)

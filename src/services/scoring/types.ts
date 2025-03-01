@@ -37,7 +37,7 @@ export interface DatabasePrizeModel extends Omit<PrizeDistributionModel, 'distri
 }
 
 // Expanded contest types based on the provided documentation
-export type ContestType = 'multiplayer' | 'head_to_head' | 'practice';
+export type ContestType = 'multiplayer' | 'head_to_head' | 'practice' | 'fixed_participants' | 'scheduled';
 
 // Structure for handling tiebreakers
 export interface TiebreakerRules {
@@ -58,6 +58,16 @@ export interface GameResult {
   completedAt: string;
 }
 
+// Score breakdown for detailed reporting
+export interface ScoreBreakdown {
+  total: number;
+  breakdown: {
+    basePoints: number;
+    speedBonus: number;
+    additionalPoints?: number;
+  };
+}
+
 // Contest button status types for real-time updates
 export type ContestButtonStatus = 
   | 'starting_countdown' 
@@ -66,4 +76,5 @@ export type ContestButtonStatus =
   | 'finalizing_results' 
   | 'view_leaderboard' 
   | 'contest_full'
-  | 'join_contest';
+  | 'join_contest'
+  | 'games_completed';

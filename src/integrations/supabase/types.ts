@@ -90,6 +90,7 @@ export type Database = {
           entry_fee: number
           id: string
           max_participants: number | null
+          min_participants: number | null
           prize_calculation_status: string | null
           prize_distribution_type: string
           prize_pool: number
@@ -108,6 +109,7 @@ export type Database = {
           entry_fee?: number
           id?: string
           max_participants?: number | null
+          min_participants?: number | null
           prize_calculation_status?: string | null
           prize_distribution_type?: string
           prize_pool?: number
@@ -126,6 +128,7 @@ export type Database = {
           entry_fee?: number
           id?: string
           max_participants?: number | null
+          min_participants?: number | null
           prize_calculation_status?: string | null
           prize_distribution_type?: string
           prize_pool?: number
@@ -513,6 +516,10 @@ export type Database = {
           p_contest_id: string
         }
         Returns: Json
+      }
+      update_completed_contests: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
       }
     }
     Enums: {
