@@ -1,7 +1,7 @@
 
 export interface ScoringRule {
   id: string;
-  game_category: 'arrange_sort' | 'trivia' | 'spot_difference';
+  game_category: 'arrange_sort' | 'trivia' | 'spot_difference' | 'grid_flash_memory';
   base_points: number;
   additional_points?: number | null;
   conditions?: Record<string, any> | null;
@@ -35,3 +35,35 @@ export type DatabaseScoringRule = Omit<ScoringRule, 'conditions'> & {
 export interface DatabasePrizeModel extends Omit<PrizeDistributionModel, 'distribution_rules'> {
   distribution_rules: string;
 }
+
+// Expanded contest types based on the provided documentation
+export type ContestType = 'multiplayer' | 'head_to_head' | 'practice';
+
+// Structure for handling tiebreakers
+export interface TiebreakerRules {
+  primary: 'completion_time' | 'score';
+  secondary: 'completion_time' | 'score';
+  splitPrizeOnTie: boolean;
+}
+
+// Enhanced game result interface for tracking all necessary data
+export interface GameResult {
+  userId: string;
+  gameContentId: string;
+  contestId: string;
+  score: number;
+  timeTaken: number;
+  isCorrect: boolean;
+  additionalData?: Record<string, any>;
+  completedAt: string;
+}
+
+// Contest button status types for real-time updates
+export type ContestButtonStatus = 
+  | 'starting_countdown' 
+  | 'continue_game' 
+  | 'waiting_for_players'
+  | 'finalizing_results' 
+  | 'view_leaderboard' 
+  | 'contest_full'
+  | 'join_contest';

@@ -105,8 +105,8 @@ export async function calculateGameScore(
 
     // Only calculate speed bonus for correct answers
     if (isCorrect) {
-      // Pass 30 seconds as the game duration for the speed bonus calculation
-      const speedBonus = calculateSpeedBonus(timeTaken, 30, speedBonusRules);
+      // Calculate speed bonus based on the time taken to answer
+      const speedBonus = calculateSpeedBonus(timeTaken);
       totalScore += speedBonus;
     }
 
@@ -135,7 +135,31 @@ function evaluateConditions(
   }
 }
 
-function calculateSpeedBonus(
+/**
+ * Calculate speed bonus based on time taken to complete the game
+ * Following the new tiered bonus structure:
+ * - ≤ 5 seconds: +8 points
+ * - 5-10 seconds: +6 points
+ * - 10-15 seconds: +4 points
+ * - 15-20 seconds: +2 points
+ * - > 20 seconds: No bonus
+ */
+function calculateSpeedBonus(timeTaken: number): number {
+  if (timeTaken <= 5) {
+    return 8;
+  } else if (timeTaken <= 10) {
+    return 6;
+  } else if (timeTaken <= 15) {
+    return 4;
+  } else if (timeTaken <= 20) {
+    return 2;
+  }
+  return 0;
+}
+
+// Legacy function kept for compatibility with existing database rules
+// This will be used if we still have speed bonus rules in the database
+function calculateDatabaseSpeedBonus(
   submissionTime: number, // Time at which the answer was submitted
   gameDuration: number, // Total game duration (30 sec)
   speedRules: SpeedBonusRule[]
