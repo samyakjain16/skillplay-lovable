@@ -68,33 +68,85 @@ export async function calculatePrizeDistribution(
 
     const prizeDistribution = new Map<string, number>();
 
-    // Handle tie scenarios based on completion_rank
-    const rankPrizesMap = new Map<number, { total: number, users: string[] }>();
+    // Map to store prize amounts by rank
+    const rankPrizesMap = new Map<number, number>();
     
-    // Group users by their completion_rank and calculate prize pools per rank
+    // Calculate prize amount for each rank based on distribution model
     rankings.forEach(ranking => {
-      const rank = ranking.completion_rank;
+      const rank = ranking.rank; // Use rank (based only on score)
       const percentage = model.distribution_rules[rank.toString()];
       
-      if (percentage) {
+      if (percentage && !rankPrizesMap.has(rank)) {
         const prizeForRank = (totalPrizePool * percentage) / 100;
-        
-        if (!rankPrizesMap.has(rank)) {
-          rankPrizesMap.set(rank, { total: prizeForRank, users: [ranking.user_id] });
-        } else {
-          const entry = rankPrizesMap.get(rank)!;
-          entry.users.push(ranking.user_id);
-        }
+        rankPrizesMap.set(rank, prizeForRank);
       }
     });
 
-    // Distribute prizes based on the grouped ranks
-    rankPrizesMap.forEach(({ total, users }, rank) => {
-      const prizePerUser = Math.floor(total / users.length); // Split evenly for tied users
+    // Group users by score to identify ties
+    const scoreGroups = new Map<number, Array<{userId: string, completionRank: number}>>();
+    
+    rankings.forEach(ranking => {
+      const score = ranking.total_score;
       
-      users.forEach(userId => {
-        prizeDistribution.set(userId, prizePerUser);
+      if (!scoreGroups.has(score)) {
+        scoreGroups.set(score, []);
+      }
+      
+      scoreGroups.get(score)!.push({
+        userId: ranking.user_id,
+        completionRank: ranking.completion_rank
       });
+    });
+
+    // Distribute prizes based on score groups
+    scoreGroups.forEach((users, score) => {
+      // Find the rank for this score group
+      const firstUser = users[0];
+      const rankForScore = rankings.find(r => r.user_id === firstUser.userId)?.rank;
+      
+      if (!rankForScore || !rankPrizesMap.has(rankForScore)) {
+        return; // No prize for this rank
+      }
+      
+      const prizeForRank = rankPrizesMap.get(rankForScore)!;
+      
+      if (users.length === 1) {
+        // Only one user with this score, they get the full prize
+        prizeDistribution.set(users[0].userId, prizeForRank);
+      } else {
+        // Multiple users with the same score
+        // Sort by completion rank (which already considers completion time)
+        users.sort((a, b) => a.completionRank - b.completionRank);
+        
+        // Group users by completion rank (users with same completion rank completed at exactly the same time)
+        const completionGroups = new Map<number, string[]>();
+        
+        users.forEach(user => {
+          if (!completionGroups.has(user.completionRank)) {
+            completionGroups.set(user.completionRank, []);
+          }
+          completionGroups.get(user.completionRank)!.push(user.userId);
+        });
+        
+        // Distribute prizes based on completion rank
+        let remainingPrize = prizeForRank;
+        let processedUsers = 0;
+        
+        Array.from(completionGroups.entries())
+          .sort(([rankA], [rankB]) => rankA - rankB) // Sort by completion rank
+          .forEach(([_, userIds]) => {
+            const usersInGroup = userIds.length;
+            const prizeForGroup = remainingPrize * (usersInGroup / (users.length - processedUsers));
+            const prizePerUser = Math.floor(prizeForGroup / usersInGroup); // Split evenly for users with identical completion time
+            
+            userIds.forEach(userId => {
+              prizeDistribution.set(userId, prizePerUser);
+            });
+            
+            remainingPrize -= prizePerUser * usersInGroup;
+            processedUsers += usersInGroup;
+          });
+      }
     });
 
     // After calculating prizes, distribute them and update status
