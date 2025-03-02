@@ -2,7 +2,7 @@
 import { Trophy, Users, Clock, Award, Hash, CircleDollarSign } from "lucide-react";
 import { CountdownTimer } from "../CountdownTimer";
 import { useQuery } from "@tanstack/react-query";
-import { getPrizeDistributionModels } from "@/services/scoring/prizeDistribution";
+import { getPrizeDistributionDetails } from "@/services/scoring/distributionModels";
 
 interface ContestDetailsProps {
   currentParticipants: number;
@@ -25,24 +25,27 @@ export const ContestDetails = ({
   contestType,
   entryFee
 }: ContestDetailsProps) => {
-  const { data: distributionModels } = useQuery({
-    queryKey: ["prize-distribution-models"],
-    queryFn: getPrizeDistributionModels,
+  const { data: prizeDistribution } = useQuery({
+    queryKey: ["prize-distribution", prizeDistributionType],
+    queryFn: async () => {
+      // Create a mock contest ID for this query since we're just interested in the model
+      return getPrizeDistributionDetails("mock-id-" + prizeDistributionType);
+    },
+    enabled: !!prizeDistributionType
   });
 
   const getPrizeBreakdown = () => {
-    if (!distributionModels) return null;
-    const model = distributionModels.get(prizeDistributionType);
-    if (!model) return null;
-
+    if (!prizeDistribution) return null;
+    
     const actualPrizePool = contestType === 'fixed_participants' 
       ? maxParticipants * entryFee * 0.9 
       : totalPrizePool;
 
     const breakdown = [];
     // Parse the distribution rules and calculate prize amounts
-    Object.entries(model.distribution_rules).forEach(([position, percentage]) => {
-      const amount = (actualPrizePool * percentage) / 100;
+    Object.entries(prizeDistribution.breakdowns).forEach(([position, percentage]) => {
+      const numericPercentage = Number(percentage);
+      const amount = (actualPrizePool * numericPercentage) / 100;
       breakdown.push({ position: parseInt(position), amount });
     });
 
@@ -101,8 +104,6 @@ export const ContestDetails = ({
           ))}
         </div>
       )}
-
-      
 
       {contestType !== 'fixed_participants' && (
         <div className="flex items-center justify-between">
