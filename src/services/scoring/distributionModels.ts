@@ -58,7 +58,26 @@ export async function getPrizeDistributionDetails(contestId: string): Promise<{
   breakdowns: Record<string, number>;
 }> {
   try {
-    // Get contest details
+    // Get distribution models
+    const models = await getPrizeDistributionModels();
+    
+    // For mock contest IDs, extract the distribution type from the ID
+    if (contestId.startsWith('mock-id-')) {
+      const distributionType = contestId.replace('mock-id-', '');
+      const model = models.get(distributionType);
+      
+      if (!model) {
+        throw new Error(`Distribution model not found: ${distributionType}`);
+      }
+      
+      return {
+        distributionType: distributionType,
+        prizePool: 0, // Mock value
+        breakdowns: model.distribution_rules
+      };
+    }
+    
+    // For real contest IDs, get the data from the contests table
     const { data: contest, error } = await supabase
       .from('contests')
       .select('prize_pool, prize_distribution_type')
@@ -68,7 +87,6 @@ export async function getPrizeDistributionDetails(contestId: string): Promise<{
     if (error) throw error;
     
     // Get distribution model
-    const models = await getPrizeDistributionModels();
     const model = models.get(contest.prize_distribution_type);
     
     if (!model) {

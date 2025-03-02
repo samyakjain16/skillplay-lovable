@@ -25,31 +25,38 @@ export const ContestDetails = ({
   contestType,
   entryFee
 }: ContestDetailsProps) => {
-  const { data: prizeDistribution } = useQuery({
+  const { data: prizeDistribution, isError } = useQuery({
     queryKey: ["prize-distribution", prizeDistributionType],
     queryFn: async () => {
       // Create a mock contest ID for this query since we're just interested in the model
       return getPrizeDistributionDetails("mock-id-" + prizeDistributionType);
     },
-    enabled: !!prizeDistributionType
+    enabled: !!prizeDistributionType,
+    retry: 1, // Only retry once to prevent too many error logs
+    gcTime: 5 * 60 * 1000, // Keep failed queries in cache to prevent repeated failures
   });
 
   const getPrizeBreakdown = () => {
-    if (!prizeDistribution) return null;
+    if (!prizeDistribution || isError) return null;
     
     const actualPrizePool = contestType === 'fixed_participants' 
       ? maxParticipants * entryFee * 0.9 
       : totalPrizePool;
 
     const breakdown = [];
-    // Parse the distribution rules and calculate prize amounts
-    Object.entries(prizeDistribution.breakdowns).forEach(([position, percentage]) => {
-      const numericPercentage = Number(percentage);
-      const amount = (actualPrizePool * numericPercentage) / 100;
-      breakdown.push({ position: parseInt(position), amount });
-    });
+    try {
+      // Parse the distribution rules and calculate prize amounts
+      Object.entries(prizeDistribution.breakdowns).forEach(([position, percentage]) => {
+        const numericPercentage = Number(percentage);
+        const amount = (actualPrizePool * numericPercentage) / 100;
+        breakdown.push({ position: parseInt(position), amount });
+      });
 
-    return breakdown.sort((a, b) => a.position - b.position);
+      return breakdown.sort((a, b) => a.position - b.position);
+    } catch (error) {
+      console.error('Error calculating prize breakdown:', error);
+      return null;
+    }
   };
 
   const prizeBreakdown = getPrizeBreakdown();
@@ -90,7 +97,7 @@ export const ContestDetails = ({
         <span>{seriesCount} Games</span>
       </div>
       
-      {prizeBreakdown && (
+      {prizeBreakdown && prizeBreakdown.length > 0 && (
         <div className="border-t border-gray-100 pt-2 mt-2">
           <div className="text-xs font-medium text-primary mb-2">Prize Distribution</div>
           {prizeBreakdown.map(({ position, amount }) => (
