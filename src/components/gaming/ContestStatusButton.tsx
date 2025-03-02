@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Loader2, CheckCircle, Clock } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
@@ -38,7 +37,6 @@ export const ContestStatusButton = ({
     if (!user || !isInMyContests) return;
 
     try {
-      // Get contest start time and user's progress
       const { data: contestData } = await supabase
         .from('contests')
         .select(`
@@ -58,30 +56,24 @@ export const ContestStatusButton = ({
       const userContest = contestData[0].user_contests[0];
       const completedGames = userContest.completed_games || [];
       
-      // If contest is completed, update button status
       if (contestData[0].status === 'completed') {
         setButtonStatus('view_leaderboard');
         return;
       }
       
-      // Calculate time-based game number
       const contestStartTime = new Date(contestData[0].start_time);
       const now = new Date();
       const elapsedSeconds = Math.floor((now.getTime() - contestStartTime.getTime()) / 1000);
-      const timeBasedGameNumber = Math.floor(elapsedSeconds / 30) + 1; // +1 for display
+      const timeBasedGameNumber = Math.floor(elapsedSeconds / 30) + 1;
 
-      // Calculate effective game number based on completed games and current index
       const gameFromIndex = userContest.current_game_index + 1;
       const gameFromCompleted = completedGames.length + 1;
       
-      // Use the maximum of all calculations
       const effectiveGameNumber = Math.max(timeBasedGameNumber, gameFromIndex, gameFromCompleted);
       
-      // Only update if it's within the series count
       if (effectiveGameNumber <= contest.series_count) {
         setCurrentGameNumber(effectiveGameNumber);
         
-        // Update button status based on game number
         const remainingGames = contest.series_count - completedGames.length;
         if (remainingGames === 0) {
           setButtonStatus('games_completed');
@@ -147,9 +139,7 @@ export const ContestStatusButton = ({
     };
   }, [contest.status, contest.id, contest.start_time, contest.end_time, queryClient, isInMyContests]);
   
-  // Effect to determine button status based on contest state
   useEffect(() => {
-    // Non-joined contests
     if (!isInMyContests) {
       if (contest.current_participants >= contest.max_participants) {
         setButtonStatus('contest_full');
@@ -159,7 +149,6 @@ export const ContestStatusButton = ({
       return;
     }
     
-    // Joined contests
     if (userCompletedGames) {
       setButtonStatus('games_completed');
     } else if (contest.status === 'completed') {
@@ -168,13 +157,11 @@ export const ContestStatusButton = ({
       if (currentGameNumber) {
         setButtonStatus('continue_game');
       } else {
-        // Default for in-progress contests
         setButtonStatus('continue_game');
       }
     } else if (contest.status === 'waiting_for_players') {
       setButtonStatus('waiting_for_players');
     } else {
-      // Default for other statuses
       setButtonStatus(contest.status === 'upcoming' ? 'join_contest' : 'view_leaderboard');
     }
   }, [contest.status, contest.current_participants, contest.max_participants, isInMyContests, userCompletedGames, currentGameNumber]);
@@ -190,7 +177,6 @@ export const ContestStatusButton = ({
     }
   };
 
-  // Button text mapper
   const getButtonText = (): string => {
     switch (buttonStatus) {
       case 'join_contest':
@@ -218,7 +204,6 @@ export const ContestStatusButton = ({
     }
   };
 
-  // Button style and state mapper
   const getButtonState = () => {
     const styles = {
       disabled: false,
@@ -266,6 +251,9 @@ export const ContestStatusButton = ({
   const buttonText = getButtonText();
   const buttonState = getButtonState();
 
+  const currentGameIndex = currentGameNumber ? currentGameNumber - 1 : 0;
+  const isLastGameCompleted = userCompletedGames || buttonStatus === 'games_completed';
+
   return (
     <div className="relative w-full">
       <Button 
@@ -282,7 +270,11 @@ export const ContestStatusButton = ({
         ) : buttonState.showProgress ? (
           <>
             <span className="relative z-10">{buttonText}</span>
-            <ContestProgressBar progress={progress} />
+            <ContestProgressBar 
+              currentGameIndex={currentGameIndex}
+              totalGames={contest.series_count}
+              isCompleted={isLastGameCompleted}
+            />
           </>
         ) : (
           <>
