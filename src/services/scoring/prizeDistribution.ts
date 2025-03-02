@@ -44,14 +44,22 @@ export async function distributePrizes(
       if (statusError) throw statusError;
     }
 
-    // Instead of processing prizes directly, trigger the database function that has service role permissions
-    // This is more reliable and avoids RLS issues
+    // Convert the Map to an array of objects for RPC call
+    const prizeArray = Array.from(prizeDistribution).map(([userId, amount]) => ({
+      user_id: userId,
+      amount: amount
+    }));
+
+    // Call the updated database function
     try {
       const { data, error } = await client
-        .rpc('distribute_contest_prizes', { contest_id: contestId });
+        .rpc('distribute_contest_prizes_client', { 
+          contest_id: contestId,
+          prize_data: prizeArray
+        });
       
       if (error) {
-        console.error('Error calling distribute_contest_prizes function:', error);
+        console.error('Error calling prize distribution function:', error);
         throw error;
       }
       

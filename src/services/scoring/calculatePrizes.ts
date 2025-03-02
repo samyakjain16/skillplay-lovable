@@ -43,8 +43,8 @@ export async function calculatePrizeDistribution(
   }
 
   try {
-    // For client-side calculation, we'll just prepare the distribution map
-    // But actual distribution will be handled server-side
+    // This will be used for display purposes only
+    // Actual prize distribution is handled server-side
     const models = await getPrizeDistributionModels();
     const model = models.get(distributionType);
 
@@ -114,52 +114,26 @@ export async function calculatePrizeDistribution(
       
       if (users.length === 1) {
         // Only one user with this score, they get the full prize
-        prizeDistribution.set(users[0].userId, prizeForRank);
+        prizeDistribution.set(users[0].userId, Math.floor(prizeForRank * 100) / 100);
       } else {
-        // Multiple users with the same score
-        // Sort by completion rank (which already considers completion time)
-        users.sort((a, b) => a.completionRank - b.completionRank);
-        
-        // Group users by completion rank (users with same completion rank completed at exactly the same time)
-        const completionGroups = new Map<number, string[]>();
+        // Multiple users with the same score - handle ties properly
+        // Split the prize equally among tied users regardless of completion time
+        const prizePerUser = Math.floor((prizeForRank / users.length) * 100) / 100;
         
         users.forEach(user => {
-          if (!completionGroups.has(user.completionRank)) {
-            completionGroups.set(user.completionRank, []);
-          }
-          completionGroups.get(user.completionRank)!.push(user.userId);
+          prizeDistribution.set(user.userId, prizePerUser);
         });
-        
-        // Distribute prizes based on completion rank
-        let remainingPrize = prizeForRank;
-        let processedUsers = 0;
-        
-        Array.from(completionGroups.entries())
-          .sort(([rankA], [rankB]) => rankA - rankB) // Sort by completion rank
-          .forEach(([_, userIds]) => {
-            const usersInGroup = userIds.length;
-            const prizeForGroup = remainingPrize * (usersInGroup / (users.length - processedUsers));
-            const prizePerUser = Math.floor(prizeForGroup / usersInGroup); // Split evenly for users with identical completion time
-            
-            userIds.forEach(userId => {
-              prizeDistribution.set(userId, prizePerUser);
-            });
-            
-            remainingPrize -= prizePerUser * usersInGroup;
-            processedUsers += usersInGroup;
-          });
       }
     });
 
-    // Request prize distribution from the server rather than doing it client-side
-    // This ensures correct permissions are used
+    // Request prize distribution from the server
     if (prizeDistribution.size > 0) {
       try {
-        // Call the server to distribute prizes
+        // Trigger server-side prize distribution
         await distributePrizes(contestId, prizeDistribution);
       } catch (error) {
         console.error('Error during prize distribution:', error);
-        // We don't throw here because we still want to return the distribution
+        // We still want to return the distribution for display
       }
     }
 
