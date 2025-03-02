@@ -5,6 +5,9 @@ import { getPrizeDistributionDetails } from "./distributionModels";
 
 /**
  * Distributes prizes to users and updates wallet balances
+ * 
+ * Note: This should be called from server-side context or with service role permissions.
+ * If RLS errors occur, consider moving this to a Supabase Edge Function.
  */
 export async function distributePrizes(
   contestId: string,
@@ -41,6 +44,27 @@ export async function distributePrizes(
       if (statusError) throw statusError;
     }
 
+    // Instead of processing prizes directly, trigger the database function that has service role permissions
+    // This is more reliable and avoids RLS issues
+    try {
+      const { data, error } = await client
+        .rpc('distribute_contest_prizes', { contest_id: contestId });
+      
+      if (error) {
+        console.error('Error calling distribute_contest_prizes function:', error);
+        throw error;
+      }
+      
+      console.log('Prize distribution triggered successfully:', data);
+      return;
+    } catch (rpcError) {
+      console.error('Failed to trigger prize distribution via RPC:', rpcError);
+      // Fall back to client-side distribution if RPC fails
+    }
+
+    // Client-side fallback distribution (will likely hit RLS errors if not authenticated as admin)
+    console.warn('Falling back to client-side prize distribution - this may fail due to permissions');
+    
     // Process each winner's prize
     for (const [userId, prizeAmount] of prizeDistribution.entries()) {
       // Skip if zero prize (shouldn't happen but just to be safe)

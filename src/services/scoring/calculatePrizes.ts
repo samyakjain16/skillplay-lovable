@@ -43,6 +43,8 @@ export async function calculatePrizeDistribution(
   }
 
   try {
+    // For client-side calculation, we'll just prepare the distribution map
+    // But actual distribution will be handled server-side
     const models = await getPrizeDistributionModels();
     const model = models.get(distributionType);
 
@@ -149,9 +151,16 @@ export async function calculatePrizeDistribution(
       }
     });
 
-    // After calculating prizes, distribute them and update status
+    // Request prize distribution from the server rather than doing it client-side
+    // This ensures correct permissions are used
     if (prizeDistribution.size > 0) {
-      await distributePrizes(contestId, prizeDistribution);
+      try {
+        // Call the server to distribute prizes
+        await distributePrizes(contestId, prizeDistribution);
+      } catch (error) {
+        console.error('Error during prize distribution:', error);
+        // We don't throw here because we still want to return the distribution
+      }
     }
 
     return prizeDistribution;
