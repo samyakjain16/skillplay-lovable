@@ -1,11 +1,10 @@
-
 import { useParams } from "react-router-dom";
 import { Navigation } from "@/components/Navigation";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { calculatePrizeDistribution } from "@/services/scoring/prizeDistribution";
+import { calculatePrizeDistribution, getPrizeDistributionDetails } from "@/services/scoring/prizeDistribution";
 import { useToast } from "@/components/ui/use-toast";
 import { Trophy, Clock, Award, CheckCircle } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -16,10 +15,11 @@ interface LeaderboardEntry {
   user_id: string;
   total_score: number;
   rank: number;
+  completion_rank: number;
   username?: string | null;
-  prize?: number;
   games_completed?: number;
   average_time?: number;
+  prize?: number; // Make prize optional since it might not be in the DB response
 }
 
 const ContestLeaderboard = () => {
@@ -27,6 +27,7 @@ const ContestLeaderboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [refreshKey, setRefreshKey] = useState(0);
+  const [prizeMap, setPrizeMap] = useState<Map<string, number>>(new Map());
 
   // Auto-refresh timer for in-progress contests
   useEffect(() => {
@@ -55,6 +56,26 @@ const ContestLeaderboard = () => {
       return data;
     }
   });
+
+  // Fetch prize distribution separately if contest is completed
+  useEffect(() => {
+    const fetchPrizes = async () => {
+      if (contest?.status === 'completed' && contest.prize_pool > 0 && id) {
+        try {
+          const prizes = await calculatePrizeDistribution(
+            id,
+            contest.prize_pool,
+            contest.prize_distribution_type
+          );
+          setPrizeMap(prizes);
+        } catch (error) {
+          console.error('Error fetching prize distribution:', error);
+        }
+      }
+    };
+    
+    fetchPrizes();
+  }, [contest, id]);
 
   const { data: leaderboard, isLoading } = useQuery({
     queryKey: ["contest-leaderboard", id, refreshKey],
@@ -90,32 +111,7 @@ const ContestLeaderboard = () => {
           profiles?.map(p => [p.id, p.username]) || []
         );
 
-        // Calculate prize distribution if contest is completed
-        if (contest.status === 'completed' && contest.prize_pool > 0) {
-          try {
-            const prizes = await calculatePrizeDistribution(
-              id,
-              contest.prize_pool,
-              contest.prize_distribution_type
-            );
-
-            // Combine all data
-            return rankings.map(rank => ({
-              ...rank,
-              username: usernameMap.get(rank.user_id) || 'Anonymous',
-              prize: prizes.get(rank.user_id) || 0
-            }));
-          } catch (error) {
-            console.error('Error calculating prizes:', error);
-            toast({
-              variant: "destructive",
-              title: "Error",
-              description: "Failed to calculate prize distribution"
-            });
-          }
-        }
-
-        // Return rankings with usernames but no prizes
+        // Return rankings with usernames
         return rankings.map(rank => ({
           ...rank,
           username: usernameMap.get(rank.user_id) || 'Anonymous'
@@ -245,9 +241,11 @@ const ContestLeaderboard = () => {
                         </td>
                         {contest?.prize_pool > 0 && (
                           <td className="p-4 text-right font-medium">
-                            {entry.prize && contest.status === 'completed' 
-                              ? `$${entry.prize.toFixed(2)}` 
-                              : (contest.status === 'completed' ? '-' : 'Pending')}
+                            {contest.status === 'completed' 
+                              ? (prizeMap.get(entry.user_id) 
+                                ? `$${prizeMap.get(entry.user_id)?.toFixed(2)}` 
+                                : '-') 
+                              : 'Pending'}
                           </td>
                         )}
                       </tr>

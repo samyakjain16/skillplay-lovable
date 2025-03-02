@@ -68,6 +68,18 @@ export interface ScoreBreakdown {
   };
 }
 
+// Leaderboard entry type for consistent usage across components
+export interface LeaderboardEntry {
+  user_id: string;
+  total_score: number;
+  rank: number;
+  completion_rank: number;
+  username?: string;
+  games_completed?: number;
+  average_time?: number;
+  prize?: number;
+}
+
 // Contest button status types for real-time updates
 export type ContestButtonStatus = 
   | 'starting_countdown' 
