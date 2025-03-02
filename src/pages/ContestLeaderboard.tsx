@@ -9,18 +9,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { Trophy, Clock, Award, CheckCircle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { useEffect, useState } from "react";
-
-// Define types for our leaderboard data
-interface LeaderboardEntry {
-  user_id: string;
-  total_score: number;
-  rank: number;
-  completion_rank: number;
-  username?: string | null;
-  games_completed?: number;
-  average_time?: number;
-  prize?: number; // Make prize optional since it might not be in the DB response
-}
+import { LeaderboardEntry } from "@/services/scoring/types";
 
 const ContestLeaderboard = () => {
   const { id } = useParams();
@@ -29,13 +18,12 @@ const ContestLeaderboard = () => {
   const [refreshKey, setRefreshKey] = useState(0);
   const [prizeMap, setPrizeMap] = useState<Map<string, number>>(new Map());
 
-  // Auto-refresh timer for in-progress contests
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
     if (contest?.status === 'in_progress') {
       timer = setTimeout(() => {
         setRefreshKey(prev => prev + 1);
-      }, 10000); // Refresh every 10 seconds for in-progress contests
+      }, 10000);
     }
     return () => clearTimeout(timer);
   }, [refreshKey]);
@@ -57,7 +45,6 @@ const ContestLeaderboard = () => {
     }
   });
 
-  // Fetch prize distribution separately if contest is completed
   useEffect(() => {
     const fetchPrizes = async () => {
       if (contest?.status === 'completed' && contest.prize_pool > 0 && id) {
@@ -83,7 +70,6 @@ const ContestLeaderboard = () => {
       if (!contest || !id) return [];
 
       try {
-        // Get leaderboard data using the database function
         const { data: rankings, error: rankingsError } = await supabase
           .rpc('get_contest_leaderboard', { contest_id: id });
 
@@ -96,7 +82,6 @@ const ContestLeaderboard = () => {
           return [];
         }
 
-        // Get usernames for all participants
         const { data: profiles, error: profilesError } = await supabase
           .from('profiles')
           .select('id, username')
@@ -111,7 +96,6 @@ const ContestLeaderboard = () => {
           profiles?.map(p => [p.id, p.username]) || []
         );
 
-        // Return rankings with usernames
         return rankings.map(rank => ({
           ...rank,
           username: usernameMap.get(rank.user_id) || 'Anonymous'
