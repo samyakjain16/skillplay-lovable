@@ -487,6 +487,13 @@ export type Database = {
         }
         Returns: boolean
       }
+      distribute_contest_prizes_client: {
+        Args: {
+          contest_id: string
+          prize_data: Json
+        }
+        Returns: boolean
+      }
       get_contest_leaderboard: {
         Args: {
           contest_id: string
