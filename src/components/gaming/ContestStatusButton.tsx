@@ -161,13 +161,14 @@ export const ContestStatusButton = ({
       }
     } else if (contest.status === 'waiting_for_players') {
       setButtonStatus('waiting_for_players');
-    } else {
-      setButtonStatus(contest.status === 'upcoming' ? 'join_contest' : 'view_leaderboard');
+    } else if (contest.status === 'upcoming') {
+      setButtonStatus('join_contest');
     }
+    // No default case to avoid changing status to 'view_leaderboard' inappropriately
   }, [contest.status, contest.current_participants, contest.max_participants, isInMyContests, userCompletedGames, currentGameNumber]);
 
   const handleClick = async () => {
-    if (loading || buttonState.disabled) return;
+    if (loading || getButtonState().disabled) return;
     
     setLocalLoading(true);
     try {
